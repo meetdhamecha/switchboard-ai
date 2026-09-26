@@ -1,0 +1,3870 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Switchboard AI</title>
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f0876a'/%3E%3Cstop offset='.55' stop-color='%239b6bff'/%3E%3Cstop offset='1' stop-color='%234f8cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M6 16h8M14 16l12-8M14 16h12M14 16l12 8' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css"
+    id="hljs-theme">
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0b0f;
+      --bg-2: #0f1116;
+      --panel: #14161d;
+      --panel-2: #1a1d25;
+      --hover: rgba(255, 255, 255, .05);
+      --border: rgba(255, 255, 255, .08);
+      --border-strong: rgba(255, 255, 255, .14);
+      --text: #e9eaf0;
+      --text-2: #c3c6d1;
+      --muted: #8b90a0;
+      --faint: #5d6272;
+      --claude: #e58a6a;
+      --claude-2: #d97757;
+      --agy: #6d8dff;
+      --agy-2: #9b6bff;
+      --accent: #8b7bff;
+      --ok: #3ecf8e;
+      --warn: #f5b454;
+      --err: #ff6b6b;
+      --brand: linear-gradient(120deg, #f0876a 0%, #9b6bff 55%, #4f8cff 100%);
+      --shadow: 0 20px 50px -20px rgba(0, 0, 0, .6);
+      --code-bg: #0d0f14;
+      --user-bubble: #1e2130;
+      --radius: 14px;
+      --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+      color-scheme: dark;
+    }
+
+    :root[data-theme="light"] {
+      --bg: #f6f6f9;
+      --bg-2: #eeeef3;
+      --panel: #ffffff;
+      --panel-2: #f7f7fa;
+      --hover: rgba(20, 20, 40, .05);
+      --border: rgba(20, 22, 40, .10);
+      --border-strong: rgba(20, 22, 40, .18);
+      --text: #16171d;
+      --text-2: #33363f;
+      --muted: #666c7a;
+      --faint: #9aa0ad;
+      --shadow: 0 20px 50px -24px rgba(30, 30, 60, .25);
+      --code-bg: #f3f4f8;
+      --user-bubble: #ecebfb;
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14.5px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      background: none;
+      border: 0;
+      cursor: pointer;
+    }
+
+    input,
+    textarea,
+    select {
+      font: inherit;
+      color: inherit;
+    }
+
+    svg.i {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+
+    svg.i.sm {
+      width: 15px;
+      height: 15px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-strong);
+      border-radius: 10px;
+      border: 3px solid transparent;
+      background-clip: padding-box;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::selection {
+      background: rgba(139, 123, 255, .35);
+    }
+
+    /* ── layout ───────────────────────────────────────────── */
+    .app {
+      display: grid;
+      grid-template-columns: 272px minmax(0, 1fr);
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    .sidebar {
+      background: var(--bg-2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      z-index: 30;
+    }
+
+    .main {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .main::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        radial-gradient(600px 300px at 15% -5%, rgba(240, 135, 106, .10), transparent 70%),
+        radial-gradient(700px 360px at 90% -10%, rgba(79, 140, 255, .10), transparent 70%);
+    }
+
+    .main>* {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── sidebar ──────────────────────────────────────────── */
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 18px 18px 14px;
+    }
+
+    .logo {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--brand);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 6px 18px -6px rgba(155, 107, 255, .6);
+    }
+
+    .logo svg {
+      width: 20px;
+      height: 20px;
+      stroke: #fff;
+      stroke-width: 2.6;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .brand-name {
+      font-weight: 700;
+      font-size: 15.5px;
+      letter-spacing: -.01em;
+    }
+
+    .brand-sub {
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-top: -1px;
+    }
+
+    .new-chat {
+      margin: 4px 14px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 11px;
+      font-weight: 600;
+      font-size: 13.5px;
+      background: var(--panel);
+      border: 1px solid var(--border-strong);
+      transition: border-color .15s, transform .1s;
+    }
+
+    .new-chat:hover {
+      border-color: var(--accent);
+    }
+
+    .new-chat:active {
+      transform: scale(.98);
+    }
+
+    .nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 4px 10px 10px;
+    }
+
+    .nav button {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 9px;
+      color: var(--text-2);
+      font-size: 13.5px;
+      font-weight: 500;
+      text-align: left;
+    }
+
+    .nav button:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    .nav button.active {
+      background: var(--panel);
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+
+    .nav button.active svg {
+      color: var(--accent);
+    }
+
+    .side-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--faint);
+      padding: 12px 20px 6px;
+    }
+
+    .convs {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 10px 10px;
+      min-height: 0;
+    }
+
+    .conv {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 9px;
+      font-size: 13.2px;
+      color: var(--text-2);
+      text-align: left;
+    }
+
+    .conv:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    .conv.active {
+      background: var(--panel);
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+
+    .conv .t {
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .conv .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .conv .del {
+      opacity: 0;
+      color: var(--muted);
+      padding: 2px;
+      border-radius: 6px;
+    }
+
+    .conv:hover .del {
+      opacity: 1;
+    }
+
+    .conv .del:hover {
+      color: var(--err);
+    }
+
+    .convs-empty {
+      color: var(--faint);
+      font-size: 12.5px;
+      padding: 6px 12px;
+    }
+
+    .side-foot {
+      border-top: 1px solid var(--border);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .prov-mini {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .prov-mini .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--text-2);
+    }
+
+    .prov-mini .row .st {
+      margin-left: auto;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+
+    .led {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--faint);
+      flex-shrink: 0;
+    }
+
+    .led.on {
+      background: var(--ok);
+      box-shadow: 0 0 0 3px rgba(62, 207, 142, .15);
+    }
+
+    .led.off {
+      background: var(--err);
+      box-shadow: 0 0 0 3px rgba(255, 107, 107, .12);
+    }
+
+    .foot-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 32px;
+      min-width: 32px;
+      padding: 0 9px;
+      border-radius: 9px;
+      color: var(--muted);
+      border: 1px solid transparent;
+      font-size: 12.5px;
+    }
+
+    .icon-btn:hover {
+      background: var(--hover);
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    /* ── topbar ───────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      min-height: 60px;
+      background: color-mix(in srgb, var(--bg) 70%, transparent);
+      backdrop-filter: blur(10px);
+    }
+
+    .menu-btn {
+      display: none;
+    }
+
+    .view-title {
+      font-weight: 600;
+      font-size: 15px;
+      margin-right: 4px;
+      white-space: nowrap;
+    }
+
+    .top-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .conn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 5px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+
+    .offline-card {
+      max-width: 620px;
+      margin: 26px auto 0;
+      text-align: left;
+    }
+
+    .offline-card ol {
+      padding-left: 20px;
+      margin-top: 10px;
+      color: var(--text-2);
+      font-size: 13.5px;
+    }
+
+    .offline-card li {
+      margin: 8px 0;
+    }
+
+    .offline-card code {
+      font-family: var(--mono);
+      font-size: 12.5px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      padding: 2px 7px;
+      border-radius: 6px;
+    }
+
+    .model-btn {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 10px 7px 9px;
+      border-radius: 11px;
+      background: var(--panel);
+      border: 1px solid var(--border-strong);
+      max-width: 340px;
+      min-width: 0;
+      transition: border-color .15s;
+    }
+
+    .model-btn:hover,
+    .model-btn.open {
+      border-color: var(--accent);
+    }
+
+    .model-btn .name {
+      font-weight: 600;
+      font-size: 13.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .model-btn .chev {
+      color: var(--muted);
+    }
+
+    .pmark {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .pmark svg {
+      width: 13px;
+      height: 13px;
+      stroke: #fff;
+      fill: none;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Raster logos (e.g. agy-logo.png) take the mark's size, not their native one */
+    .pmark img {
+      width: inherit;
+      height: inherit;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .pmark.claude {
+      background: linear-gradient(135deg, #f19a79, #d2694a);
+    }
+
+    .pmark.antigravity {
+      background: transparent;
+    }
+
+    .pmark.antigravity svg {
+      width: 17px;
+      height: 17px;
+      stroke: none;
+      fill: none;
+    }
+
+    .pmark.none {
+      background: var(--faint);
+    }
+
+    .pmark.auto {
+      background: var(--brand);
+    }
+
+    .select {
+      appearance: none;
+      background: var(--panel);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 7px 28px 7px 10px;
+      font-size: 13px;
+      color: var(--text-2);
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b90a0' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 9px center;
+    }
+
+    .select:hover {
+      border-color: var(--accent);
+    }
+
+    /* model popover */
+    .popover {
+      position: fixed;
+      width: 380px;
+      max-width: calc(100vw - 24px);
+      background: var(--panel);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      z-index: 50;
+      overflow: hidden;
+      animation: pop .14s ease-out;
+    }
+
+    @keyframes pop {
+      from {
+        opacity: 0;
+        transform: translateY(-4px) scale(.99);
+      }
+    }
+
+    .pop-search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .pop-search input {
+      flex: 1;
+      background: none;
+      border: 0;
+      outline: none;
+      font-size: 13.5px;
+      color: var(--text);
+    }
+
+    .pop-list {
+      max-height: min(460px, 60vh);
+      overflow-y: auto;
+      padding: 6px;
+    }
+
+    .pop-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 8px 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: .03em;
+      text-transform: uppercase;
+    }
+
+    .pop-group .pill {
+      margin-left: auto;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .pop-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 8px 9px;
+      border-radius: 9px;
+      text-align: left;
+    }
+
+    .pop-item:hover:not(:disabled),
+    .pop-item.kb {
+      background: var(--hover);
+    }
+
+    .pop-item:disabled {
+      opacity: .42;
+      cursor: not-allowed;
+    }
+
+    .pop-item .n {
+      font-size: 13.5px;
+      font-weight: 500;
+    }
+
+    .pop-item .id {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .pop-item .check {
+      margin-left: auto;
+      color: var(--accent);
+    }
+
+    .tier {
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 20px;
+      background: var(--hover);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .pill.ok {
+      color: var(--ok);
+      background: rgba(62, 207, 142, .12);
+    }
+
+    .pill.off {
+      color: var(--err);
+      background: rgba(255, 107, 107, .12);
+    }
+
+    .pill.warn {
+      color: var(--warn);
+      background: rgba(245, 180, 84, .12);
+    }
+
+    .pill.neutral {
+      color: var(--muted);
+      background: var(--hover);
+    }
+
+    /* ── views ────────────────────────────────────────────── */
+    .view {
+      display: none;
+      flex: 1;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    .view.active {
+      display: flex;
+    }
+
+    .scroll {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .wrap {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 28px 24px;
+    }
+
+    /* chat */
+    .hero {
+      text-align: center;
+      padding: 7vh 8px 10px;
+    }
+
+    .hero-logo {
+      width: 58px;
+      height: 58px;
+      border-radius: 17px;
+      margin: 0 auto 18px;
+      background: var(--brand);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 16px 40px -12px rgba(155, 107, 255, .55);
+    }
+
+    .hero-logo svg {
+      width: 32px;
+      height: 32px;
+      stroke: #fff;
+      stroke-width: 2.4;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .hero h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -.025em;
+    }
+
+    .hero h1 span {
+      background: var(--brand);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero p {
+      color: var(--muted);
+      margin-top: 8px;
+      font-size: 14.5px;
+    }
+
+    .prov-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 28px auto 0;
+      max-width: 620px;
+    }
+
+    .prov-card {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      text-align: left;
+      padding: 14px;
+      border-radius: var(--radius);
+      background: var(--panel);
+      border: 1px solid var(--border);
+    }
+
+    .prov-card .pmark {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+    }
+
+    .prov-card .pmark svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .prov-card .pmark.antigravity svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .prov-card h3 {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .prov-card p {
+      color: var(--muted);
+      font-size: 12.5px;
+      margin-top: 3px;
+    }
+
+    .prov-card.off {
+      opacity: .6;
+    }
+
+    .suggest {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 18px auto 0;
+      max-width: 620px;
+    }
+
+    .suggest button {
+      text-align: left;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel) 60%, transparent);
+      font-size: 13px;
+      color: var(--text-2);
+      transition: border-color .15s, background .15s;
+    }
+
+    .suggest button:hover {
+      border-color: var(--border-strong);
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    .suggest b {
+      display: block;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+      font-size: 13.2px;
+    }
+
+    .msgs {
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+      padding-bottom: 12px;
+    }
+
+    .msg {
+      display: flex;
+      gap: 14px;
+      animation: rise .22s ease-out;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+    }
+
+    .msg.user {
+      justify-content: flex-end;
+    }
+
+    .msg.user .bubble {
+      background: var(--user-bubble);
+      border: 1px solid var(--border);
+      padding: 10px 15px;
+      border-radius: 16px 16px 4px 16px;
+      max-width: 78%;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .msg .avatar {
+      margin-top: 2px;
+    }
+
+    .msg .avatar.pmark {
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+    }
+
+    .msg .avatar.pmark svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .msg .avatar.pmark.antigravity svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .msg .body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .msg .who {
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .msg .who b {
+      color: var(--text-2);
+      font-weight: 600;
+    }
+
+    .msg .who .route-tag {
+      font-size: 11px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      cursor: help;
+    }
+
+    .md {
+      word-wrap: break-word;
+      color: var(--text);
+    }
+
+    .md>*:first-child {
+      margin-top: 0;
+    }
+
+    .md p,
+    .md ul,
+    .md ol,
+    .md blockquote,
+    .md table,
+    .md .code {
+      margin: 0 0 12px;
+    }
+
+    .md>*:last-child {
+      margin-bottom: 0;
+    }
+
+    .md h1,
+    .md h2,
+    .md h3,
+    .md h4 {
+      margin: 20px 0 8px;
+      line-height: 1.3;
+      letter-spacing: -.01em;
+    }
+
+    .md h1 {
+      font-size: 1.45em;
+    }
+
+    .md h2 {
+      font-size: 1.25em;
+    }
+
+    .md h3 {
+      font-size: 1.1em;
+    }
+
+    .md ul,
+    .md ol {
+      padding-left: 22px;
+    }
+
+    .md li {
+      margin: 3px 0;
+    }
+
+    .md a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .md a:hover {
+      text-decoration: underline;
+    }
+
+    .md blockquote {
+      border-left: 3px solid var(--border-strong);
+      padding: 2px 14px;
+      color: var(--text-2);
+    }
+
+    .md :not(pre)>code {
+      font-family: var(--mono);
+      font-size: .86em;
+      background: var(--hover);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 6px;
+    }
+
+    .md table {
+      border-collapse: collapse;
+      display: block;
+      overflow-x: auto;
+      font-size: 13.5px;
+    }
+
+    .md th,
+    .md td {
+      border: 1px solid var(--border);
+      padding: 6px 11px;
+      text-align: left;
+    }
+
+    .md th {
+      background: var(--hover);
+      font-weight: 600;
+    }
+
+    .md hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 18px 0;
+    }
+
+    .md img {
+      max-width: 100%;
+      border-radius: 10px;
+    }
+
+    .code {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--code-bg);
+    }
+
+    .code-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px 6px 14px;
+      font-size: 11.5px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+    }
+
+    .code pre {
+      margin: 0;
+      padding: 14px;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 12.8px;
+      line-height: 1.6;
+    }
+
+    .code pre code.hljs {
+      background: transparent;
+      padding: 0;
+    }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 8px;
+      border-radius: 7px;
+      color: var(--muted);
+      font-size: 11.5px;
+      font-family: var(--font);
+    }
+
+    .copy-btn:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    .cursor::after {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 16px;
+      margin-left: 2px;
+      vertical-align: -2px;
+      background: var(--accent);
+      border-radius: 2px;
+      animation: blink 1s steps(2) infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .thinking {
+      display: inline-flex;
+      gap: 5px;
+      padding: 8px 0;
+    }
+
+    .thinking i {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      animation: bounce 1.2s infinite ease-in-out;
+    }
+
+    .thinking i:nth-child(2) {
+      animation-delay: .15s;
+    }
+
+    .thinking i:nth-child(3) {
+      animation-delay: .3s;
+    }
+
+    @keyframes bounce {
+
+      0%,
+      80%,
+      100% {
+        transform: scale(.6);
+        opacity: .4;
+      }
+
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 2px 0 10px;
+    }
+
+    .tool {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      max-width: 100%;
+      padding: 4px 10px 4px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text-2);
+    }
+
+    .tool .tn {
+      font-weight: 600;
+      font-family: var(--mono);
+      font-size: 11.5px;
+    }
+
+    .tool .td {
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 360px;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .tool .ts {
+      width: 14px;
+      height: 14px;
+      display: grid;
+      place-items: center;
+    }
+
+    .tool.run .ts::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      border-right-color: transparent;
+      animation: spin .7s linear infinite;
+    }
+
+    .tool.ok .ts {
+      color: var(--ok);
+    }
+
+    .tool.fail .ts {
+      color: var(--err);
+    }
+
+    .tool.fail {
+      border-color: rgba(255, 107, 107, .3);
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .notice,
+    .err-box {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      font-size: 13px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      margin: 8px 0;
+    }
+
+    .notice {
+      background: rgba(245, 180, 84, .09);
+      border: 1px solid rgba(245, 180, 84, .25);
+      color: var(--text-2);
+    }
+
+    .notice svg {
+      color: var(--warn);
+      margin-top: 1px;
+    }
+
+    .err-box {
+      background: rgba(255, 107, 107, .08);
+      border: 1px solid rgba(255, 107, 107, .3);
+      color: var(--text-2);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .err-box svg {
+      color: var(--err);
+      margin-top: 1px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 12px;
+      margin-top: 10px;
+      font-size: 11.8px;
+      color: var(--faint);
+    }
+
+    .meta .acts {
+      display: flex;
+      gap: 2px;
+      margin-left: -6px;
+    }
+
+    .meta .acts button {
+      padding: 4px 6px;
+      border-radius: 7px;
+      color: var(--muted);
+      display: inline-flex;
+    }
+
+    .meta .acts button:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    /* composer */
+    .composer-wrap {
+      padding: 8px 24px 18px;
+    }
+
+    .composer {
+      max-width: 820px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--border-strong);
+      border-radius: 18px;
+      padding: 10px 10px 10px 16px;
+      box-shadow: var(--shadow);
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    .composer:focus-within {
+      border-color: color-mix(in srgb, var(--accent) 65%, var(--border-strong));
+      box-shadow: 0 0 0 4px rgba(139, 123, 255, .12), var(--shadow);
+    }
+
+    .composer textarea {
+      width: 100%;
+      resize: none;
+      border: 0;
+      outline: none;
+      background: none;
+      font-size: 14.5px;
+      line-height: 1.55;
+      max-height: 220px;
+      min-height: 24px;
+      padding: 4px 0;
+    }
+
+    .composer textarea::placeholder {
+      color: var(--faint);
+    }
+
+    .composer-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      min-width: 0;
+    }
+
+    .composer-row .hint {
+      font-size: 11.5px;
+      color: var(--faint);
+      margin-left: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .composer-row .model-btn {
+      padding: 5px 8px 5px 6px;
+      border-radius: 10px;
+      background: var(--bg-2);
+      border-color: var(--border);
+      gap: 7px;
+      max-width: 280px;
+    }
+
+    .composer-row .model-btn .name {
+      font-size: 12.8px;
+    }
+
+    .composer-row .pmark {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+    }
+
+    .composer-row .pmark svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .composer-row .pmark.antigravity svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .composer-row .select {
+      background-color: var(--bg-2);
+      border-color: var(--border);
+      padding: 6px 26px 6px 9px;
+      font-size: 12.5px;
+      border-radius: 10px;
+    }
+
+    .composer-row .chip {
+      height: 31px;
+      border-radius: 10px;
+    }
+
+    .send {
+      margin-left: auto;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: var(--brand);
+      color: #fff;
+      box-shadow: 0 8px 20px -8px rgba(155, 107, 255, .7);
+      transition: transform .1s, opacity .15s, filter .15s;
+    }
+
+    .send:hover {
+      filter: brightness(1.08);
+    }
+
+    .send:active {
+      transform: scale(.94);
+    }
+
+    .send:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .send.stop {
+      background: var(--text);
+      color: var(--bg);
+      box-shadow: none;
+    }
+
+    .foot-note {
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--faint);
+      margin-top: 8px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .chip:hover {
+      color: var(--text);
+      border-color: var(--border-strong);
+    }
+
+    .chip.on {
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+      background: rgba(139, 123, 255, .08);
+    }
+
+    /* cards & forms (agent / api / status) */
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+
+    .card+.card {
+      margin-top: 14px;
+    }
+
+    .card h2 {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .card .sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 3px;
+    }
+
+    .page-head {
+      margin-bottom: 18px;
+    }
+
+    .page-head h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+
+    .page-head p {
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 14px;
+    }
+
+    .field label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .field .help {
+      font-size: 12px;
+      color: var(--faint);
+    }
+
+    .input,
+    .textarea {
+      width: 100%;
+      background: var(--bg-2);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 9px 12px;
+      outline: none;
+      font-size: 13.5px;
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    .input.mono {
+      font-family: var(--mono);
+      font-size: 12.8px;
+    }
+
+    .textarea {
+      resize: vertical;
+      min-height: 110px;
+      line-height: 1.55;
+    }
+
+    .input:focus,
+    .textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(139, 123, 255, .14);
+    }
+
+    .row-gap {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 13.5px;
+      background: var(--panel-2);
+      border: 1px solid var(--border-strong);
+      transition: border-color .15s, filter .15s, transform .1s;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .btn:hover {
+      border-color: var(--accent);
+    }
+
+    .btn:active {
+      transform: scale(.98);
+    }
+
+    .btn.primary {
+      background: var(--brand);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 8px 20px -10px rgba(155, 107, 255, .8);
+    }
+
+    .btn.primary:hover {
+      filter: brightness(1.08);
+    }
+
+    .btn.danger {
+      color: var(--err);
+    }
+
+    .btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .btn.sm {
+      padding: 5px 10px;
+      font-size: 12.5px;
+      border-radius: 8px;
+    }
+
+    .warn-banner {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 11px 13px;
+      border-radius: 11px;
+      font-size: 13px;
+      background: rgba(245, 180, 84, .08);
+      border: 1px solid rgba(245, 180, 84, .25);
+      color: var(--text-2);
+      margin-top: 14px;
+    }
+
+    .warn-banner svg {
+      color: var(--warn);
+      margin-top: 1px;
+    }
+
+    .timeline {
+      margin-top: 16px;
+    }
+
+    .run {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .run+.run {
+      margin-top: 14px;
+    }
+
+    .run-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-2);
+    }
+
+    .run-head .task {
+      font-weight: 600;
+      font-size: 13.5px;
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .run-body {
+      padding: 16px;
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .steps .tool {
+      width: fit-content;
+    }
+
+    .run-foot {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .run-foot .input {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      width: fit-content;
+      flex-wrap: wrap;
+    }
+
+    .tabs button {
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .tabs button.active {
+      background: var(--panel);
+      color: var(--text);
+      box-shadow: 0 1px 0 var(--border), 0 0 0 1px var(--border);
+    }
+
+    .endpoints {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    .endpoints td {
+      padding: 9px 8px;
+      border-top: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .endpoints td:first-child {
+      width: 70px;
+    }
+
+    .endpoints code {
+      font-family: var(--mono);
+      font-size: 12.5px;
+    }
+
+    .verb {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 6px;
+    }
+
+    .verb.GET {
+      color: #3ecf8e;
+      background: rgba(62, 207, 142, .12);
+    }
+
+    .verb.POST {
+      color: #6d8dff;
+      background: rgba(109, 141, 255, .14);
+    }
+
+    .verb.DELETE {
+      color: #ff6b6b;
+      background: rgba(255, 107, 107, .12);
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 8px 14px;
+      margin-top: 14px;
+      font-size: 13px;
+    }
+
+    .kv dt {
+      color: var(--muted);
+    }
+
+    .kv dd {
+      font-family: var(--mono);
+      font-size: 12px;
+      word-break: break-all;
+      color: var(--text-2);
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .sessions {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.8px;
+      margin-top: 12px;
+    }
+
+    .sessions th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding: 6px 8px;
+    }
+
+    .sessions td {
+      padding: 8px;
+      border-top: 1px solid var(--border);
+    }
+
+    .sessions td.mono {
+      font-family: var(--mono);
+      font-size: 11.5px;
+    }
+
+    .empty-note {
+      color: var(--faint);
+      font-size: 13px;
+      padding: 10px 2px 2px;
+    }
+
+    /* modal & toast */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 6, 10, .55);
+      backdrop-filter: blur(4px);
+      display: none;
+      place-items: center;
+      z-index: 100;
+      padding: 16px;
+    }
+
+    .overlay.show {
+      display: grid;
+      animation: fade .15s;
+    }
+
+    @keyframes fade {
+      from {
+        opacity: 0;
+      }
+    }
+
+    .modal {
+      width: 460px;
+      max-width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--border-strong);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      animation: pop .16s ease-out;
+    }
+
+    .modal h2 {
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .modal .sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .toasts {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 200;
+    }
+
+    .toast {
+      background: var(--panel);
+      border: 1px solid var(--border-strong);
+      border-radius: 11px;
+      padding: 10px 14px;
+      font-size: 13px;
+      box-shadow: var(--shadow);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      animation: rise .2s;
+      max-width: 360px;
+    }
+
+    .toast.err {
+      border-color: rgba(255, 107, 107, .4);
+    }
+
+    .toast.err svg {
+      color: var(--err);
+    }
+
+    .toast.ok svg {
+      color: var(--ok);
+    }
+
+    .scrim {
+      display: none;
+    }
+
+    @media (max-width: 860px) {
+      .app {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 280px;
+        transform: translateX(-100%);
+        transition: transform .22s ease;
+        box-shadow: var(--shadow);
+      }
+
+      .app.nav-open .sidebar {
+        transform: none;
+      }
+
+      .app.nav-open .scrim {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, .45);
+        z-index: 25;
+      }
+
+      .menu-btn {
+        display: inline-flex;
+      }
+
+      .topbar {
+        padding: 10px 12px;
+        gap: 8px;
+      }
+
+      .view-title {
+        display: none;
+      }
+
+      .wrap {
+        padding: 20px 16px;
+      }
+
+      .composer-wrap {
+        padding: 6px 12px 12px;
+      }
+
+      .prov-cards,
+      .suggest,
+      .grid2 {
+        grid-template-columns: 1fr;
+      }
+
+      .model-btn {
+        max-width: 210px;
+      }
+
+      .composer-row .model-btn {
+        max-width: 150px;
+      }
+
+      .composer-row .select {
+        max-width: 104px;
+      }
+
+      .composer-row .send {
+        margin-left: auto;
+      }
+
+      .conn .conn-text {
+        display: none;
+      }
+
+      .msg.user .bubble {
+        max-width: 90%;
+      }
+
+      .kv {
+        grid-template-columns: 1fr;
+        gap: 2px;
+      }
+
+      .kv dd {
+        margin-bottom: 8px;
+      }
+
+      .hide-sm {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- icon sprite -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <symbol id="i-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" />
+      </symbol>
+      <symbol id="i-send" viewBox="0 0 24 24">
+        <path d="M12 19V5M5 12l7-7 7 7" />
+      </symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24">
+        <rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none" />
+      </symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24">
+        <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.8A8 8 0 1 1 21 12z" />
+      </symbol>
+      <symbol id="i-agent" viewBox="0 0 24 24">
+        <rect x="4" y="8" width="16" height="12" rx="3" />
+        <path d="M12 8V4M9 13h.01M15 13h.01M9.5 17h5" />
+        <circle cx="12" cy="3.5" r="1" />
+      </symbol>
+      <symbol id="i-code" viewBox="0 0 24 24">
+        <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
+      </symbol>
+      <symbol id="i-pulse" viewBox="0 0 24 24">
+        <path d="M3 12h4l3-8 4 16 3-8h4" />
+      </symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3" />
+        <path
+          d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+      </symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24">
+        <rect x="9" y="9" width="12" height="12" rx="2" />
+        <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="M20 6 9 17l-5-5" />
+      </symbol>
+      <symbol id="i-x" viewBox="0 0 24 24">
+        <path d="M18 6 6 18M6 6l12 12" />
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24">
+        <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24">
+        <path d="m6 9 6 6 6-6" />
+      </symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24">
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      </symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path d="M21 12a9 9 0 0 1-15.5 6.2L3 16M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M3 21v-5h5" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24">
+        <path d="M12 9v4M12 17h.01" />
+        <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+      </symbol>
+      <symbol id="i-key" viewBox="0 0 24 24">
+        <circle cx="7.5" cy="15.5" r="4.5" />
+        <path d="m10.7 12.3 9.8-9.8M17 6l3 3M15 8l2 2" />
+      </symbol>
+      <symbol id="i-retry" viewBox="0 0 24 24">
+        <path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" />
+      </symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24">
+        <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 24 24">
+        <path d="m7 4 13 8-13 8z" />
+      </symbol>
+      <!-- provider marks (abstract, not official logos) -->
+      <symbol id="p-claude" viewBox="0 0 24 24">
+        <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" />
+      </symbol>
+      <symbol id="p-antigravity" viewBox="0 0 100 90">
+        <defs>
+          <linearGradient id="agy-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#4285F4" />
+            <stop offset="35%" stop-color="#34A853" />
+            <stop offset="65%" stop-color="#FBBC04" />
+            <stop offset="100%" stop-color="#EA4335" />
+          </linearGradient>
+        </defs>
+        <path fill="url(#agy-grad)" stroke="none"
+          d="M50 2 C46 2 43 5 40 9 L5 78 C2 83 4 88 9 89 C13 90 17 88 19 84 L30 63 C33 57 39 53 46 53 L54 53 C61 53 67 57 70 63 L81 84 C83 88 87 90 91 89 C96 88 98 83 95 78 L60 9 C57 5 54 2 50 2 Z M50 18 L62 42 C64 46 61 50 57 50 L43 50 C39 50 36 46 38 42 Z" />
+      </symbol>
+      <symbol id="p-none" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="6" />
+      </symbol>
+      <symbol id="i-logo" viewBox="0 0 24 24">
+        <path d="M3 12h7M10 12l9-7M10 12h9M10 12l9 7" />
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="app" id="app">
+    <div class="scrim" data-act="close-nav"></div>
+
+    <!-- ── sidebar ── -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo"><svg>
+            <use href="#i-logo" />
+          </svg></div>
+        <div>
+          <div class="brand-name">Switchboard AI</div>
+          <div class="brand-sub">Claude Code + Antigravity</div>
+        </div>
+      </div>
+      <button class="new-chat" data-act="new-chat"><svg class="i sm">
+          <use href="#i-plus" />
+        </svg>New chat</button>
+      <nav class="nav">
+        <button data-view="chat" class="active"><svg class="i">
+            <use href="#i-chat" />
+          </svg>Chat</button>
+        <button data-view="agent"><svg class="i">
+            <use href="#i-agent" />
+          </svg>Agent</button>
+        <button data-view="api"><svg class="i">
+            <use href="#i-code" />
+          </svg>API &amp; Docs</button>
+        <button data-view="status"><svg class="i">
+            <use href="#i-key" />
+          </svg>Status &amp; Auth</button>
+      </nav>
+      <div class="side-label">Conversations</div>
+      <div class="convs" id="convs"></div>
+      <div class="side-foot">
+        <div class="prov-mini" id="prov-mini" style="cursor:pointer" data-view="status"
+          title="Click to view Accounts & Auth"></div>
+        <div class="foot-actions">
+          <button class="icon-btn" data-act="theme" title="Toggle theme"><svg class="i sm" id="theme-icon">
+              <use href="#i-sun" />
+            </svg></button>
+          <button class="icon-btn" data-act="settings" title="Settings"><svg class="i sm">
+              <use href="#i-gear" />
+            </svg>Settings</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── main ── -->
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" data-act="open-nav" aria-label="Menu"><svg class="i">
+            <use href="#i-menu" />
+          </svg></button>
+        <div class="view-title" id="view-title">Chat</div>
+        <div class="top-right">
+          <button class="btn sm" data-view="status" title="Claude & Antigravity Accounts & Tokens"
+            style="display:flex;align-items:center;gap:6px;font-weight:600"><svg class="i sm">
+              <use href="#i-key" />
+            </svg><span>Accounts &amp; Auth</span></button>
+          <span class="conn" id="conn"><span class="led"></span><span class="conn-text">Connecting…</span></span>
+          <button class="icon-btn" data-act="new-chat" title="New chat (Ctrl+Shift+O)"><svg class="i sm">
+              <use href="#i-plus" />
+            </svg><span class="hide-sm">New chat</span></button>
+        </div>
+      </header>
+
+      <!-- CHAT -->
+      <section class="view active" id="view-chat">
+        <div class="scroll" id="chat-scroll">
+          <div class="wrap">
+            <div id="hero" class="hero"></div>
+            <div class="msgs" id="msgs"></div>
+          </div>
+        </div>
+        <div class="composer-wrap">
+          <div class="composer">
+            <textarea id="prompt" rows="1" placeholder="Message…"></textarea>
+            <div class="composer-row">
+              <button class="model-btn" data-act="models" title="Choose model">
+                <span class="pmark none mb-mark"><svg>
+                    <use href="#p-none" />
+                  </svg></span>
+                <span class="name mb-name">Loading…</span>
+                <span class="tier mb-tier hide-sm" style="display:none"></span>
+                <svg class="i sm chev">
+                  <use href="#i-chev" />
+                </svg>
+              </button>
+              <select class="select effort-select" title="Reasoning effort"></select>
+              <button class="chip" id="memory-chip" data-act="toggle-memory"></button>
+              <span class="hint hide-sm">Enter to send · Shift+Enter new line</span>
+              <button class="send" id="send-btn" data-act="send" disabled aria-label="Send"><svg class="i">
+                  <use href="#i-send" />
+                </svg></button>
+            </div>
+          </div>
+          <div class="foot-note" id="foot-note"></div>
+        </div>
+      </section>
+
+      <!-- AGENT -->
+      <section class="view" id="view-agent">
+        <div class="scroll">
+          <div class="wrap">
+            <div class="page-head">
+              <h1>Agent tasks</h1>
+              <p>Let the model read and edit files in a folder on this machine.</p>
+            </div>
+            <div class="card">
+              <div class="field" style="margin-top:0">
+                <label>Model &amp; effort</label>
+                <div class="row-gap">
+                  <button class="model-btn" data-act="models" title="Choose model">
+                    <span class="pmark none mb-mark"><svg>
+                        <use href="#p-none" />
+                      </svg></span>
+                    <span class="name mb-name">Loading…</span>
+                    <span class="tier mb-tier" style="display:none"></span>
+                    <svg class="i sm chev">
+                      <use href="#i-chev" />
+                    </svg>
+                  </button>
+                  <select class="select effort-select" title="Reasoning effort"></select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="agent-dir">Working folder</label>
+                <input class="input mono" id="agent-dir" placeholder="C:\Projects\my-app" autocomplete="off">
+                <span class="help" id="agent-dir-help"></span>
+              </div>
+              <div class="field" id="agent-tools-field">
+                <label>Allowed tools</label>
+                <div class="row-gap" id="agent-tools"></div>
+                <span class="help" id="agent-tools-help"></span>
+              </div>
+              <div class="field">
+                <label for="agent-task">Task</label>
+                <textarea class="textarea" id="agent-task"
+                  placeholder="e.g. Read the Python files in this folder and write a SUMMARY.md describing what each one does."></textarea>
+              </div>
+              <div class="row-gap" style="margin-top:14px">
+                <button class="btn primary" id="agent-run" data-act="agent-run"><svg class="i sm">
+                    <use href="#i-play" />
+                  </svg>Run task</button>
+                <span class="help" style="font-size:12px;color:var(--faint)">Ctrl+Enter to run</span>
+              </div>
+              <div class="warn-banner" id="agent-shell-warn" hidden>
+                <svg class="i sm">
+                  <use href="#i-alert" />
+                </svg>
+                <div><b>Shell access is enabled</b> (AGENT_ALLOW_SHELL=1). Agents can run any command on this computer.
+                </div>
+              </div>
+            </div>
+            <div class="timeline" id="runs"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- API -->
+      <section class="view" id="view-api">
+        <div class="scroll">
+          <div class="wrap">
+            <div class="page-head">
+              <h1>Use it as a REST API</h1>
+              <p>Any language, any tool. Examples below use the model picked above.</p>
+            </div>
+            <div class="card">
+              <h2>Base URL</h2>
+              <div class="row-gap" style="margin-top:10px">
+                <input class="input mono" id="base-url" readonly style="flex:1;min-width:220px">
+                <button class="btn sm" data-copy-from="base-url"><svg class="i sm">
+                    <use href="#i-copy" />
+                  </svg>Copy</button>
+                <a class="btn sm" id="docs-link" href="/docs" target="_blank" rel="noopener">Swagger docs</a>
+              </div>
+            </div>
+            <div class="card">
+              <div class="row-gap" style="justify-content:space-between">
+                <h2>Examples</h2>
+                <div class="tabs" id="snip-tabs">
+                  <button data-snip="curl" class="active">cURL</button>
+                  <button data-snip="python">Python</button>
+                  <button data-snip="stream">Streaming</button>
+                  <button data-snip="openai">OpenAI SDK</button>
+                  <button data-snip="js">JavaScript</button>
+                </div>
+              </div>
+              <div class="md" style="margin-top:14px" id="snippet"></div>
+            </div>
+            <div class="card">
+              <h2>Endpoints</h2>
+              <table class="endpoints" id="endpoints"></table>
+            </div>
+            <div class="card">
+              <h2>Model names</h2>
+              <p class="sub">Send a bare id like <code class="mono">gemini-3.8-flash-high</code>, or prefix the provider
+                when both have the same id: <code class="mono">antigravity:claude-sonnet-4-6</code>. Omit <code
+                  class="mono">model</code> to use the default.</p>
+              <p class="sub" style="margin-top:8px">Send a <code class="mono">session_id</code> to keep a warm
+                conversation: the model process stays alive between turns, so replies start faster and only the new
+                message is sent to the model.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STATUS -->
+      <section class="view" id="view-status">
+        <div class="scroll">
+          <div class="wrap">
+            <div class="page-head row-gap" style="justify-content:space-between">
+              <div>
+                <h1>Status</h1>
+                <p>What this server found on the machine.</p>
+              </div>
+              <button class="btn sm" data-act="refresh-status"><svg class="i sm">
+                  <use href="#i-refresh" />
+                </svg>Refresh</button>
+            </div>
+            <div class="card" style="margin-bottom:14px">
+              <div
+                style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+                <div>
+                  <h2 style="margin:0">Accounts &amp; Tokens</h2>
+                  <p class="sub" style="margin:4px 0 0 0">Direct tokens and account details extracted from Claude Code
+                    and Antigravity.</p>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <button class="btn sm" data-act="toggle-tokens"><svg class="i sm">
+                      <use href="#i-key" />
+                    </svg><span id="token-toggle-label">Show Tokens</span></button>
+                  <button class="btn sm primary" data-act="refresh-tokens"><svg class="i sm">
+                      <use href="#i-refresh" />
+                    </svg>Refresh Tokens</button>
+                </div>
+              </div>
+              <div class="grid2" id="status-accounts"></div>
+            </div>
+            <div class="grid2" id="status-providers"></div>
+            <div class="card" style="margin-top:14px">
+              <h2>Warm sessions</h2>
+              <p class="sub">Model processes kept alive for ongoing conversations. Idle ones close automatically.</p>
+              <div id="status-sessions"></div>
+            </div>
+            <div class="card">
+              <h2>Server</h2>
+              <dl class="kv" id="status-server"></dl>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- settings modal -->
+  <div class="overlay" id="settings-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <h2 id="settings-title">Settings</h2>
+      <p class="sub">Saved in this browser only.</p>
+      <div class="field">
+        <label for="set-base">Backend URL</label>
+        <input class="input mono" id="set-base" placeholder="Same as this page" autocomplete="off">
+        <span class="help">Leave empty when the page is opened from the server itself (http://localhost:8000).</span>
+      </div>
+      <div class="field">
+        <label for="set-key">API key</label>
+        <input class="input mono" id="set-key" type="password" placeholder="Only needed if the server sets API_KEY"
+          autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="set-system">System instructions</label>
+        <textarea class="textarea" id="set-system" style="min-height:90px"
+          placeholder="Optional. Sent at the start of every new conversation."></textarea>
+      </div>
+      <div class="field">
+        <label><input type="checkbox" id="set-session" style="margin-right:6px">Keep conversations warm
+          (session_id)</label>
+        <span class="help">Faster follow-ups. Turn off to send every turn statelessly.</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn danger" data-act="clear-all" style="margin-right:auto">Delete all chats</button>
+        <button class="btn" data-act="close-settings">Cancel</button>
+        <button class="btn primary" data-act="save-settings">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- auth modal -->
+  <div class="overlay" id="auth-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <h2 id="auth-title" style="display:flex;gap:10px;align-items:center"><svg class="i">
+          <use href="#i-key" />
+        </svg>API key required</h2>
+      <p class="sub">This server is protected. Enter the value of <code>API_KEY</code> from its .env file.</p>
+      <div class="field"><input class="input mono" id="auth-key" type="password" placeholder="API key"
+          autocomplete="off"></div>
+      <div class="modal-actions"><button class="btn primary" data-act="auth-submit">Unlock</button></div>
+    </div>
+  </div>
+
+  <!-- token manual edit modal -->
+  <div class="overlay" id="token-edit-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="token-edit-title">
+      <h2 id="token-edit-title" style="display:flex;gap:10px;align-items:center"><svg class="i">
+          <use href="#i-key" />
+        </svg><span id="token-edit-heading">Update Tokens</span></h2>
+      <p class="sub" id="token-edit-sub">Directly save access and refresh tokens into the account storage.</p>
+
+      <div class="field" id="field-tok-access">
+        <label for="inp-access-tok">Access Token</label>
+        <input class="input mono" id="inp-access-tok" placeholder="e.g. sk-ant-oat01-... or ya29..." autocomplete="off">
+      </div>
+      <div class="field" id="field-tok-refresh">
+        <label for="inp-refresh-tok">Refresh Token</label>
+        <input class="input mono" id="inp-refresh-tok" placeholder="e.g. sk-ant-ort01-... or 1//0g..."
+          autocomplete="off">
+      </div>
+      <div class="field" id="field-tok-api-key" style="display:none">
+        <label for="inp-api-key">API Key</label>
+        <input class="input mono" id="inp-api-key" placeholder="API Key" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" data-act="open-provider-web" id="btn-open-provider-web" style="margin-right:auto"><svg
+            class="i sm">
+            <use href="#i-play" />
+          </svg>Open Sign-in Page</button>
+        <button class="btn" data-act="close-token-edit">Cancel</button>
+        <button class="btn primary" data-act="save-manual-tokens">Save Tokens</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Claude Code OAuth Modal -->
+  <div class="overlay" id="claude-oauth-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="claude-oauth-title" style="max-width:540px">
+      <h2 id="claude-oauth-title" style="display:flex;gap:10px;align-items:center">
+        <span class="pmark claude"><svg>
+            <use href="#p-claude" />
+          </svg></span>
+        <span>Authorize Claude Code</span>
+      </h2>
+      <p class="sub" style="margin-bottom:14px">
+        Official Anthropic OAuth authorization launched without any terminal window.
+      </p>
+
+      <div
+        style="background:var(--bg-2);padding:14px;border-radius:10px;border:1px solid var(--border);margin-bottom:14px;font-size:13px;line-height:1.6">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <b>1.</b> <span>Sign in to your Anthropic account in the opened browser tab and click <b>Authorize</b>.</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <b>2.</b> <span>Copy the authorization code provided by Anthropic and paste it below:</span>
+        </div>
+        <div style="margin-top:10px">
+          <a class="btn sm" id="claude-oauth-reopen" href="https://claude.ai/login" target="_blank"
+            rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px">
+            <svg class="i sm">
+              <use href="#i-play" />
+            </svg>Re-open Claude Authorization Tab
+          </a>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="inp-claude-oauth-code">Authorization Code</label>
+        <input class="input mono" id="inp-claude-oauth-code" placeholder="Paste authorization code here"
+          autocomplete="off">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" data-act="close-claude-oauth">Cancel</button>
+        <button class="btn primary" data-act="submit-claude-oauth"><svg class="i sm">
+            <use href="#i-key" />
+          </svg>Complete Authentication</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Antigravity Google Auth Modal -->
+  <div class="overlay" id="antigravity-auth-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="antigravity-auth-title" style="max-width:540px">
+      <h2 id="antigravity-auth-title" style="display:flex;gap:10px;align-items:center">
+        <span class="pmark antigravity"><img src="/static/agy-logo.png" alt="Antigravity" draggable="false"></span>
+        <span>Antigravity Google Account</span>
+      </h2>
+      <p class="sub" style="margin-bottom:14px">
+        Google Antigravity authenticates via your Google Account &amp; Gemini AI services.
+      </p>
+
+      <div
+        style="background:var(--bg-2);padding:14px;border-radius:10px;border:1px solid var(--border);margin-bottom:14px;font-size:13px;line-height:1.6">
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <b>•</b> <span>Connected account: <span id="antigravity-modal-account">—</span></span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <b>•</b> <span>Tier: <span class="pill ok" id="antigravity-modal-tier">—</span></span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <a class="btn sm" href="https://antigravity.google" target="_blank" rel="noopener noreferrer"
+            style="display:inline-flex;align-items:center;gap:6px">
+            <svg class="i sm">
+              <use href="#i-play" />
+            </svg>Open Antigravity Portal
+          </a>
+          <a class="btn sm" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
+            style="display:inline-flex;align-items:center;gap:6px">
+            <svg class="i sm">
+              <use href="#i-key" />
+            </svg>Google AI Studio API Keys
+          </a>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="inp-antigravity-api-key">Update Gemini / Antigravity API Key</label>
+        <input class="input mono" id="inp-antigravity-api-key" placeholder="AIzaSy... or ya29..." autocomplete="off">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" data-act="close-antigravity-auth">Close</button>
+        <button class="btn primary" data-act="save-antigravity-auth">Save Key &amp; Sync</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- model picker (shared by every model button, positioned next to the one clicked) -->
+  <div class="popover" id="model-pop" hidden>
+    <div class="pop-search"><svg class="i sm">
+        <use href="#i-search" />
+      </svg><input id="model-search" placeholder="Search models…" autocomplete="off"></div>
+    <div class="pop-list" id="model-list"></div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+
+  <script>
+    "use strict";
+    /* ================================================================
+       helpers
+       ================================================================ */
+    const $ = (s, el = document) => el.querySelector(s);
+    const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+    const icon = (id, cls = "i sm") => `<svg class="${cls}"><use href="#${id}"/></svg>`;
+    const store = {
+      // "mapi." is the pre-rename prefix: read it once so saved chats carry over.
+      get(k, d) { try { const v = localStorage.getItem("sbai." + k) ?? localStorage.getItem("mapi." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+      set(k, v) { try { localStorage.setItem("sbai." + k, JSON.stringify(v)); } catch { } },
+    };
+    const fmtMs = ms => ms == null ? "" : ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+    const fmtNum = n => n == null ? "" : n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+
+    function toast(text, kind = "ok") {
+      const el = document.createElement("div");
+      el.className = "toast " + kind;
+      el.innerHTML = icon(kind === "err" ? "i-alert" : "i-check") + `<span>${esc(text)}</span>`;
+      $("#toasts").appendChild(el);
+      setTimeout(() => el.remove(), kind === "err" ? 6000 : 2600);
+    }
+
+    async function copyText(text, btn) {
+      try { await navigator.clipboard.writeText(text); }
+      catch {
+        const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select();
+        try { document.execCommand("copy"); } catch { } t.remove();
+      }
+      if (btn) {
+        const old = btn.innerHTML;
+        btn.innerHTML = icon("i-check") + (btn.dataset.label === "none" ? "" : "Copied");
+        setTimeout(() => (btn.innerHTML = old), 1300);
+      }
+    }
+
+    /* ================================================================
+       markdown
+       ================================================================ */
+    const hasMarked = typeof marked !== "undefined" && typeof DOMPurify !== "undefined";
+    if (hasMarked) marked.setOptions({ gfm: true, breaks: true });
+
+    function miniMarkdown(src) {
+      // Fallback when the CDN is unreachable: code fences, inline code, bold, paragraphs.
+      const parts = String(src).split(/```/);
+      return parts.map((part, i) => {
+        if (i % 2) {
+          const nl = part.indexOf("\n");
+          const lang = nl > -1 ? part.slice(0, nl).trim() : "";
+          const code = nl > -1 ? part.slice(nl + 1) : part;
+          return `<pre><code class="language-${esc(lang)}">${esc(code.replace(/\n$/, ""))}</code></pre>`;
+        }
+        return esc(part)
+          .replace(/`([^`\n]+)`/g, "<code>$1</code>")
+          .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+          .split(/\n{2,}/).filter(p => p.trim()).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+      }).join("");
+    }
+
+    function renderMarkdown(el, src, final) {
+      let html = hasMarked ? DOMPurify.sanitize(marked.parse(src || "")) : miniMarkdown(src || "");
+      el.innerHTML = html;
+      $$("a", el).forEach(a => { a.target = "_blank"; a.rel = "noopener noreferrer"; });
+      $$("pre", el).forEach(pre => {
+        const codeEl = pre.querySelector("code");
+        const lang = ((codeEl?.className || "").match(/language-([\w+#-]+)/) || [])[1] || "text";
+        const box = document.createElement("div");
+        box.className = "code";
+        box.innerHTML = `<div class="code-head"><span>${esc(lang)}</span><button class="copy-btn" data-act="copy-code">${icon("i-copy")}Copy</button></div>`;
+        pre.replaceWith(box);
+        box.appendChild(pre);
+        if (final && codeEl && typeof hljs !== "undefined") {
+          try { hljs.highlightElement(codeEl); } catch { }
+        }
+      });
+    }
+
+    /* ================================================================
+       state
+       ================================================================ */
+    function defaultBase() {
+      const saved = store.get("apiBase", "");
+      if (saved) return saved.replace(/\/+$/, "");
+      // Served by the backend itself → same origin. Opened as a file, or from
+      // another dev server such as VS Code Live Server → the default backend.
+      if (location.protocol === "file:" || /\/switchboard_ai\/static\//.test(location.pathname)) return "http://localhost:8000";
+      return "";
+    }
+
+    const S = {
+      base: defaultBase(),                    // "" = same origin as this page
+      offline: false,
+      health: null,
+      models: [],
+      model: store.get("model", ""),          // "provider:id"
+      effort: store.get("effort", ""),
+      key: store.get("key", ""),
+      system: store.get("system", ""),
+      useSession: store.get("useSession", true),
+      convs: store.get("convs", []),
+      revealTokens: false,
+      activeId: store.get("active", null),
+      view: "chat",
+      busy: null,                             // AbortController while streaming
+      agentBusy: null,
+      snip: "curl",
+    };
+    const saveConvs = () => { store.set("convs", S.convs.slice(0, 100)); store.set("active", S.activeId); };
+    const activeConv = () => S.convs.find(c => c.id === S.activeId) || null;
+    const modelInfo = key => S.models.find(m => m.key === key) || null;
+    const provOf = key => (key || "").split(":")[0] || "none";
+
+    /* ================================================================
+       api
+       ================================================================ */
+    function headers() {
+      const h = { "Content-Type": "application/json" };
+      if (S.key) h["Authorization"] = "Bearer " + S.key;
+      return h;
+    }
+
+    const serverUrl = () => S.base || location.origin;
+
+    async function api(path, opts = {}) {
+      const res = await fetch(S.base + path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) } });
+      if (res.status === 401 || res.status === 403) { showAuth(); throw new Error("API key required"); }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `HTTP ${res.status}`);
+      return data;
+    }
+
+    async function streamSSE(path, body, onEvent, signal) {
+      const res = await fetch(S.base + path, { method: "POST", headers: headers(), body: JSON.stringify(body), signal });
+      if (res.status === 401 || res.status === 403) { showAuth(); throw new Error("API key required"); }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(typeof d.detail === "string" ? d.detail : `HTTP ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (; ;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+          for (const line of chunk.split("\n")) {
+            if (!line.startsWith("data: ")) continue;
+            try { onEvent(JSON.parse(line.slice(6))); } catch { }
+          }
+        }
+      }
+    }
+
+    /* ================================================================
+       boot / providers / models
+       ================================================================ */
+    async function loadHealth() {
+      S.health = await api("/health");
+      S.models = await api("/models");
+      S.offline = false;
+      renderConn();
+      const ok = m => m && m.available;
+      if (!ok(modelInfo(S.model))) {
+        const def = S.health.default_model;
+        S.model = ok(modelInfo(def)) ? def : (S.models.find(m => m.available)?.key || "");
+      }
+      renderProviderMini();
+      renderModelButton();
+      renderHero();
+      renderFootNote();
+      renderAgentForm();
+      renderApi();
+    }
+
+    function provLabel(pid) {
+      return S.health?.providers?.[pid]?.label || { claude: "Claude Code", antigravity: "Antigravity", auto: "Smart routing" }[pid] || pid;
+    }
+
+    // Model "auto" is routed by the server; effort (if set) overrides its pick.
+    function effortsFor(pid) {
+      if (pid === "auto") return S.health?.providers?.claude?.efforts || ["low", "medium", "high"];
+      return S.health?.providers?.[pid]?.efforts || ["low", "medium", "high"];
+    }
+
+    function renderProviderMini() {
+      const ps = Object.values(S.health?.providers || {});
+      $("#prov-mini").innerHTML = ps.map(p => `
+    <div class="row"><span class="led ${p.available ? "on" : "off"}"></span>${esc(p.label)}
+      <span class="st">${p.available ? "connected" : p.enabled ? "not found" : "disabled"}</span></div>`).join("");
+    }
+
+    function pmark(pid, cls = "pmark") {
+      if (pid === "auto") return `<span class="${cls} auto"><svg><use href="#i-bolt"/></svg></span>`;
+      if (pid === "claude-api") pid = "claude";
+      const p = ["claude", "antigravity"].includes(pid) ? pid : "none";
+      if (p === "antigravity") {
+        return `<span class="${cls} ${p}"><img src="/static/agy-logo.png" alt="Antigravity" draggable="false"></span>`;
+      }
+      return `<span class="${cls} ${p}"><svg><use href="#p-${p}"/></svg></span>`;
+    }
+
+    function renderConn() {
+      const c = $("#conn");
+      const ok = !S.offline && S.health;
+      const n = ok ? Object.values(S.health.providers).filter(p => p.available).length : 0;
+      $(".led", c).className = "led " + (ok ? (n ? "on" : "off") : S.offline ? "off" : "");
+      $(".conn-text", c).textContent = ok ? `${n} provider${n === 1 ? "" : "s"} connected` : S.offline ? "Backend offline" : "Connecting…";
+      c.title = serverUrl();
+    }
+
+    function renderMemoryChip() {
+      const chip = $("#memory-chip");
+      chip.classList.toggle("on", S.useSession);
+      chip.innerHTML = icon(S.useSession ? "i-bolt" : "i-x") + `<span class="hide-sm">${S.useSession ? "Memory" : "No memory"}</span>`;
+      chip.title = S.useSession
+        ? "Memory on: the model process stays warm and remembers this chat (faster follow-ups). Click to turn off."
+        : "Memory off: every message is sent statelessly with the full history. Click to turn on.";
+    }
+
+    // Every model button and effort select on the page shows the same choice.
+    function renderModelButton() {
+      const m = modelInfo(S.model);
+      const pid = m ? m.provider : "none";
+      const label = m ? m.name : S.offline ? "Backend offline" : S.models.length ? "No provider available" : "Loading…";
+      $$(".model-btn").forEach(btn => {
+        // Same mark as everywhere else (Antigravity uses its PNG logo, not an SVG symbol).
+        $(".mb-mark", btn).outerHTML = pmark(pid, "pmark mb-mark");
+        $(".mb-name", btn).textContent = label;
+        const tier = $(".mb-tier", btn);
+        tier.textContent = m?.tier || "";
+        tier.style.display = m?.tier ? "" : "none";
+        btn.title = m ? `${provLabel(pid)} · ${m.id} — click to change` : "Choose model";
+      });
+      // Effort levels depend on the provider (Claude also has xhigh / max).
+      const efforts = effortsFor(pid);
+      $$(".effort-select").forEach(sel => {
+        sel.innerHTML = `<option value="">Effort: auto</option>` + efforts.map(e => `<option value="${e}">Effort: ${e}</option>`).join("");
+        sel.value = efforts.includes(S.effort) ? S.effort : "";
+      });
+      updateSend();
+    }
+
+    let popIndex = -1;
+    function renderModelList() {
+      const q = $("#model-search").value.trim().toLowerCase();
+      const groups = {};
+      for (const m of S.models) {
+        if (q && !(m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q) || m.provider.includes(q))) continue;
+        (groups[m.provider] ||= []).push(m);
+      }
+      const html = Object.entries(groups).map(([pid, ms]) => {
+        const p = pid === "auto" ? { available: ms.some(m => m.available) } : S.health?.providers?.[pid] || {};
+        const pill = pid === "auto" && p.available ? `<span class="pill ok">recommended</span>`
+          : p.available ? `<span class="pill ok">connected</span>` : `<span class="pill off">${p.enabled === false ? "disabled" : "not installed"}</span>`;
+        return `<div class="pop-group">${pmark(pid)}${esc(provLabel(pid))}${pill}</div>` + ms.map(m => `
+      <button class="pop-item" data-model="${esc(m.key)}" ${m.available ? "" : "disabled"}>
+        <div style="min-width:0"><div class="n">${esc(m.name)}</div><div class="id">${esc(m.id)}</div></div>
+        ${m.tier ? `<span class="tier">${esc(m.tier)}</span>` : ""}
+        <span class="check">${m.key === S.model ? icon("i-check") : ""}</span>
+      </button>`).join("");
+      }).join("");
+      $("#model-list").innerHTML = html || `<div class="empty-note" style="padding:14px">No models match.</div>`;
+      popIndex = -1;
+    }
+
+    function toggleModelPop(show, trigger) {
+      const pop = $("#model-pop");
+      show = show ?? pop.hidden;
+      pop.hidden = !show;
+      $$(".model-btn").forEach(b => b.classList.toggle("open", show && b === trigger));
+      if (!show) return;
+      $("#model-search").value = "";
+      renderModelList();
+      // Place next to the button that opened it: above when it sits low on the
+      // screen (the chat box), below otherwise.
+      const r = (trigger || $(".model-btn")).getBoundingClientRect();
+      const w = Math.min(380, innerWidth - 24);
+      pop.style.left = Math.max(12, Math.min(r.left, innerWidth - w - 12)) + "px";
+      if (r.top > innerHeight / 2) { pop.style.top = ""; pop.style.bottom = (innerHeight - r.top + 8) + "px"; }
+      else { pop.style.bottom = ""; pop.style.top = (r.bottom + 8) + "px"; }
+      $(".pop-list", pop).style.maxHeight = Math.min(480, Math.max(200, (r.top > innerHeight / 2 ? r.top : innerHeight - r.bottom) - 90)) + "px";
+      setTimeout(() => $("#model-search").focus(), 10);
+    }
+
+    function pickModel(key) {
+      S.model = key; store.set("model", key);
+      toggleModelPop(false);
+      renderModelButton(); renderFootNote(); renderAgentForm(); renderApi();
+    }
+
+    /* ================================================================
+       chat
+       ================================================================ */
+    const SUGGESTIONS = [
+      ["Explain a concept", "Explain how HTTP/3 differs from HTTP/2, in simple terms."],
+      ["Write code", "Write a Python function that retries an async call with exponential backoff."],
+      ["Debug", "Why would a FastAPI StreamingResponse buffer instead of streaming? List likely causes."],
+      ["Brainstorm", "Give me 5 names for a tool that joins several AI CLIs into one API."],
+    ];
+
+    function renderHero() {
+      const conv = activeConv();
+      const hero = $("#hero");
+      if (conv && conv.messages.length) { hero.innerHTML = ""; return; }
+      if (S.offline) {
+        const url = serverUrl();
+        hero.innerHTML = `
+      <div class="hero-logo"><svg><use href="#i-logo"/></svg></div>
+      <h1>Backend is not running</h1>
+      <p>This page couldn't reach the Switchboard AI server at <b>${esc(url)}</b>.</p>
+      <div class="card offline-card">
+        <h2>${icon("i-play")}Start it</h2>
+        <ol>
+          <li>Open a terminal in <code>multi_agent_system</code> (the folder that contains <code>switchboard_ai</code>).</li>
+          <li>Run <code>venv\\Scripts\\activate</code>, then <code>python -m switchboard_ai server</code><br>
+              <span style="color:var(--muted);font-size:12.5px">or just double-click <code>switchboard_ai\\start.bat</code></span></li>
+          <li>Open <code>http://localhost:8000</code> — the server hosts this UI itself, no separate frontend needed.</li>
+        </ol>
+        <div class="row-gap" style="margin-top:14px">
+          <button class="btn primary sm" data-act="retry">${icon("i-refresh")}Try again</button>
+          <button class="btn sm" data-act="settings">Change backend URL</button>
+        </div>
+      </div>`;
+        return;
+      }
+      const ps = Object.values(S.health?.providers || {});
+      const none = S.health && !ps.some(p => p.available);
+      hero.innerHTML = `
+    <div class="hero-logo"><svg><use href="#i-logo"/></svg></div>
+    <h1>One API for <span>every model</span> on this PC</h1>
+    <p>${none ? "No provider found yet — install one of the tools below, then refresh." : "Chat here, or call the same models from any app through the REST API."}</p>
+    <div class="prov-cards">${ps.map(p => `
+      <div class="prov-card ${p.available ? "" : "off"}">
+        ${pmark(p.id)}
+        <div style="min-width:0">
+          <h3>${esc(p.label)} ${p.available ? '<span class="pill ok">ready</span>' : `<span class="pill off">${p.enabled ? "not found" : "disabled"}</span>`}</h3>
+          <p>${p.id === "claude"
+          ? (p.available ? `claude.exe · ${S.models.filter(m => m.provider === "claude").length} Claude models` : "Install the Claude Code extension in VS Code, Cursor or Antigravity IDE.")
+          : (p.available ? `agy.exe · ${S.models.filter(m => m.provider === "antigravity").length} models: Gemini, GPT-OSS, Claude Thinking` : "Install the Antigravity CLI (agy.exe).")}</p>
+        </div>
+      </div>`).join("")}
+    </div>
+    ${none ? "" : `<div class="suggest">${SUGGESTIONS.map(([t, p]) => `<button data-suggest="${esc(p)}"><b>${esc(t)}</b>${esc(p)}</button>`).join("")}</div>`}`;
+    }
+
+    function renderFootNote() {
+      const m = modelInfo(S.model);
+      $("#foot-note").textContent = !m ? ""
+        : m.provider === "auto"
+          ? `Auto · picks the model, effort and web tools for each message${S.base ? " · " + S.base : ""}`
+          : `${provLabel(m.provider)} · ${m.id} · runs on your local subscription${S.base ? " · " + S.base : ""}`;
+    }
+
+    function renderConvs() {
+      const el = $("#convs");
+      if (!S.convs.length) { el.innerHTML = `<div class="convs-empty">No conversations yet.</div>`; return; }
+      el.innerHTML = S.convs.map(c => `
+    <button class="conv ${c.id === S.activeId ? "active" : ""}" data-conv="${c.id}" title="${esc(c.title)}">
+      <span class="dot" style="background:var(--${provOf(c.model) === "antigravity" ? "agy" : "claude"})"></span>
+      <span class="t">${esc(c.title)}</span>
+      <span class="del" data-del="${c.id}" title="Delete">${icon("i-x")}</span>
+    </button>`).join("");
+    }
+
+    function newChat() {
+      if (S.busy) return;
+      S.activeId = null; saveConvs();
+      renderConvs(); renderMessages(); renderHero();
+      setView("chat");
+      $("#prompt").focus();
+    }
+
+    function openConv(id) {
+      if (S.busy) return;
+      S.activeId = id; saveConvs();
+      const c = activeConv();
+      if (c && modelInfo(c.model)?.available) { S.model = c.model; store.set("model", c.model); renderModelButton(); renderFootNote(); }
+      renderConvs(); renderMessages(); renderHero();
+      setView("chat");
+    }
+
+    function deleteConv(id) {
+      const c = S.convs.find(x => x.id === id);
+      if (c?.sid) api("/sessions/" + encodeURIComponent(c.sid), { method: "DELETE" }).catch(() => { });
+      S.convs = S.convs.filter(x => x.id !== id);
+      if (S.activeId === id) S.activeId = null;
+      saveConvs(); renderConvs(); renderMessages(); renderHero();
+    }
+
+    function msgEl(msg, idx) {
+      const el = document.createElement("div");
+      el.className = "msg " + msg.role;
+      el.dataset.idx = idx;
+      if (msg.role === "user") {
+        el.innerHTML = `<div class="bubble"></div>`;
+        el.firstChild.textContent = msg.content;
+        return el;
+      }
+      el.innerHTML = `${pmark(provOf(msg.model), "avatar pmark")}
+    <div class="body">
+      <div class="who">${whoHtml(msg)}</div>
+      <div class="tools"></div>
+      <div class="md"></div>
+      <div class="extra"></div>
+      <div class="meta"></div>
+    </div>`;
+      updateMsgEl(el, msg, true);
+      return el;
+    }
+
+    // Model name, plus which lane/effort Auto chose and why (on hover).
+    function whoHtml(msg) {
+      const name = modelInfo(msg.model)?.name || (msg.model || "").split(":").pop();
+      const r = msg.meta?.route;
+      if (!r) return `<b>${esc(name)}</b>`;
+      const tip = `Auto routing: ${r.reason || r.lane}\nComplexity ${r.complexity}/5 · decided by ${r.method}` +
+        (r.fallbacks?.length ? `\nFallbacks: ${r.fallbacks.join(", ")}` : "");
+      const tag = ["Auto", r.lane, r.effort, r.needs_web ? "web" : ""].filter(Boolean).join(" · ");
+      return `<b>${esc(name)}</b><span class="route-tag" title="${esc(tip)}">${esc(tag)}</span>`;
+    }
+
+    function setRoute(el, msg, r) {
+      msg.model = `${r.provider}:${r.model}`;
+      msg.meta.route = r;
+      const av = el.querySelector(".avatar");
+      if (av) av.outerHTML = pmark(r.provider, "avatar pmark");
+      $(".who", el).innerHTML = whoHtml(msg);
+    }
+
+    function toolHtml(t) {
+      const st = t.ok === true ? "ok" : t.ok === false ? "fail" : "run";
+      const mark = t.ok === true ? icon("i-check") : t.ok === false ? icon("i-x") : "";
+      return `<span class="tool ${st}" title="${esc(t.error || t.detail || "")}"><span class="ts">${mark}</span><span class="tn">${esc(t.name)}</span>${t.detail ? `<span class="td">${esc(t.detail)}</span>` : ""}</span>`;
+    }
+
+    function updateMsgEl(el, msg, final) {
+      const tools = $(".tools", el);
+      tools.innerHTML = (msg.tools || []).map(toolHtml).join("");
+      tools.style.display = msg.tools?.length ? "" : "none";
+
+      const md = $(".md", el);
+      if (msg.content) {
+        renderMarkdown(md, msg.content, final);
+        md.classList.toggle("cursor", !final);
+      } else if (!final) {
+        md.innerHTML = `<div class="thinking"><i></i><i></i><i></i></div>`;
+      } else md.innerHTML = "";
+
+      $(".extra", el).innerHTML =
+        (msg.notices || []).map(n => `<div class="notice">${icon("i-alert")}<div>${esc(n)}</div></div>`).join("") +
+        (msg.error ? `<div class="err-box">${icon("i-alert")}<div>${esc(msg.error)}</div></div>` : "");
+
+      const meta = $(".meta", el);
+      if (!final) { meta.innerHTML = ""; return; }
+      const m = msg.meta || {};
+      const bits = [];
+      if (m.ttft != null) bits.push(`first token ${fmtMs(m.ttft)}`);
+      if (m.total != null) bits.push(`total ${fmtMs(m.total)}`);
+      if (m.usage?.output_tokens) bits.push(`${fmtNum(m.usage.input_tokens)} in · ${fmtNum(m.usage.output_tokens)} out`);
+      if (m.calls > 1) bits.push(`${m.calls} model calls`);
+      if (m.stopped) bits.push("stopped");
+      const conv = activeConv();
+      const isLast = conv && Number(el.dataset.idx) === conv.messages.length - 1;
+      meta.innerHTML = `<span class="acts">
+      <button data-act="copy-msg" title="Copy" data-label="none">${icon("i-copy")}</button>
+      ${isLast ? `<button data-act="regen" title="Regenerate">${icon("i-retry")}</button>` : ""}
+    </span>${bits.map(esc).join(" · ")}`;
+    }
+
+    function renderMessages() {
+      const box = $("#msgs");
+      box.innerHTML = "";
+      const conv = activeConv();
+      if (!conv) return;
+      conv.messages.forEach((m, i) => box.appendChild(msgEl(m, i)));
+      scrollChat(true);
+    }
+
+    let stick = true;
+    $("#chat-scroll").addEventListener("scroll", e => {
+      const s = e.target; stick = s.scrollHeight - s.scrollTop - s.clientHeight < 80;
+    });
+    function scrollChat(force) {
+      const s = $("#chat-scroll");
+      if (force || stick) s.scrollTop = s.scrollHeight;
+    }
+
+    function updateSend() {
+      const btn = $("#send-btn");
+      if (S.busy) {
+        btn.disabled = false; btn.classList.add("stop");
+        btn.innerHTML = icon("i-stop", "i"); btn.setAttribute("aria-label", "Stop");
+      } else {
+        btn.classList.remove("stop");
+        btn.innerHTML = icon("i-send", "i"); btn.setAttribute("aria-label", "Send");
+        btn.disabled = !$("#prompt").value.trim() || !modelInfo(S.model)?.available;
+      }
+    }
+
+    function autosize() {
+      const t = $("#prompt");
+      t.style.height = "auto";
+      t.style.height = Math.min(t.scrollHeight, 220) + "px";
+    }
+
+    async function send(text) {
+      text = (text ?? $("#prompt").value).trim();
+      if (!text || S.busy) return;
+      if (!modelInfo(S.model)?.available) { toast("Pick an available model first", "err"); return; }
+
+      let conv = activeConv();
+      if (!conv) {
+        conv = { id: uid(), sid: uid(), title: text.slice(0, 60), model: S.model, messages: [], created: Date.now() };
+        if (S.system.trim()) conv.system = S.system.trim();
+        S.convs.unshift(conv); S.activeId = conv.id;
+      } else {
+        S.convs = [conv, ...S.convs.filter(c => c !== conv)];
+      }
+      conv.messages.push({ role: "user", content: text });
+      $("#prompt").value = ""; autosize();
+      renderConvs(); renderHero();
+      await runTurn(conv);
+    }
+
+    async function runTurn(conv) {
+      conv.model = S.model;
+      // Failed/empty replies are not part of the conversation the model should see.
+      const history = conv.messages.filter(m => m.content).map(m => ({ role: m.role, content: m.content }));
+      if (conv.system) history.unshift({ role: "system", content: conv.system });
+
+      const msg = { role: "assistant", content: "", model: S.model, tools: [], notices: [], meta: {} };
+      conv.messages.push(msg);
+      renderMessages();
+      const el = $("#msgs").lastElementChild;
+      updateMsgEl(el, msg, false);
+      stick = true; scrollChat(true);
+
+      const ctrl = new AbortController();
+      S.busy = ctrl; updateSend();
+      const t0 = performance.now();
+      let raf = 0;
+      const paint = () => { raf = 0; updateMsgEl(el, msg, false); scrollChat(); };
+      const schedule = () => { if (!raf) raf = requestAnimationFrame(paint); };
+
+      try {
+        await streamSSE("/chat/stream", {
+          model: S.model,
+          messages: history,
+          session_id: S.useSession ? conv.sid : null,
+          effort: S.effort || null,
+        }, ev => {
+          switch (ev.type) {
+            case "route": setRoute(el, msg, ev); break;
+            case "text":
+              if (msg.meta.ttft == null) msg.meta.ttft = performance.now() - t0;
+              msg.content += ev.content; break;
+            case "tool_use": {
+              const t = msg.tools.find(x => x.id === ev.id);
+              if (t) { if (ev.detail) t.detail = ev.detail; }
+              else msg.tools.push({ id: ev.id, name: ev.name, detail: ev.detail || "", ok: null });
+              break;
+            }
+            case "tool_result": {
+              const t = msg.tools.find(x => x.id === ev.id);
+              if (t) { t.ok = ev.ok; if (ev.content) t.error = ev.content; }
+              break;
+            }
+            case "notice": msg.notices.push(ev.content); break;
+            case "error": msg.error = ev.content; break;
+            case "result": msg.meta.usage = ev.usage; msg.meta.calls = ev.orchestration?.calls; break;
+          }
+          schedule();
+        }, ctrl.signal);
+      } catch (e) {
+        if (e.name === "AbortError") msg.meta.stopped = true;
+        else msg.error = e.message || String(e);
+      } finally {
+        if (raf) cancelAnimationFrame(raf);
+        msg.meta.total = performance.now() - t0;
+        msg.tools.forEach(t => { if (t.ok === null) t.ok = !msg.error; });
+        S.busy = null; updateSend();
+        msg.content = msg.content.trim();
+        updateMsgEl(el, msg, true);
+        scrollChat();
+        saveConvs(); renderConvs();
+      }
+    }
+
+    function regenerate() {
+      const conv = activeConv();
+      if (!conv || S.busy) return;
+      if (conv.messages.at(-1)?.role === "assistant") conv.messages.pop();
+      // The warm process already holds the old answer: start a fresh session.
+      if (conv.sid) api("/sessions/" + encodeURIComponent(conv.sid), { method: "DELETE" }).catch(() => { });
+      conv.sid = uid();
+      renderMessages();
+      runTurn(conv);
+    }
+
+    /* ================================================================
+       agent
+       ================================================================ */
+    let agentToolSel = null;
+
+    function renderAgentForm() {
+      const h = S.health;
+      if (!h) return;
+      const dir = $("#agent-dir");
+      if (!dir.value) dir.value = store.get("agentDir", h.agent.working_dir || "");
+      $("#agent-dir-help").textContent = `The agent can read and change files inside this folder. Default: ${h.agent.working_dir}`;
+      $("#agent-shell-warn").hidden = !h.agent.shell_enabled;
+
+      const pid = provOf(S.model);
+      const tools = h.agent.tools[pid] || [];
+      const box = $("#agent-tools");
+      if (pid === "claude") {
+        agentToolSel ||= new Set(tools);
+        box.innerHTML = tools.map(t => `<button class="chip ${agentToolSel.has(t) ? "on" : ""}" data-tool="${esc(t)}">${agentToolSel.has(t) ? icon("i-check") : ""}${esc(t)}</button>`).join("");
+        $("#agent-tools-help").textContent = "Click to turn a tool off for this task. The server's AGENT_ALLOWED_TOOLS is the upper limit.";
+      } else if (pid === "antigravity") {
+        box.innerHTML = tools.map(t => `<span class="chip on">${icon("i-check")}${esc(t)}</span>`).join("");
+        $("#agent-tools-help").textContent = h.agent.shell_enabled
+          ? "Antigravity runs with all permissions (shell enabled on the server)."
+          : "Antigravity runs in accept-edits mode: it can read and edit files, shell commands are blocked.";
+      } else {
+        box.innerHTML = `<span class="empty-note">Pick an available model above.</span>`;
+        $("#agent-tools-help").textContent = "";
+      }
+    }
+
+    function runCard(run) {
+      const el = document.createElement("div");
+      el.className = "run";
+      el.innerHTML = `
+    <div class="run-head">${pmark(provOf(run.model))}<span class="task"></span><span class="state"></span></div>
+    <div class="run-body"><div class="steps"></div><div class="md"></div><div class="extra"></div></div>
+    <div class="run-foot" hidden>
+      <input class="input" placeholder="Follow-up instruction for this task…">
+      <button class="btn sm" data-act="agent-continue">Continue</button>
+    </div>`;
+      $(".task", el).textContent = run.task;
+      run.el = el;
+      return el;
+    }
+
+    function paintRun(run, final) {
+      const el = run.el;
+      $(".state", el).innerHTML = run.error ? `<span class="pill off">failed</span>`
+        : final ? `<span class="pill ok">done · ${fmtMs(run.total)}</span>` : `<span class="pill neutral">running…</span>`;
+      $(".steps", el).innerHTML = run.tools.map(toolHtml).join("");
+      $(".steps", el).style.display = run.tools.length ? "" : "none";
+      const md = $(".md", el);
+      if (run.content) { renderMarkdown(md, run.content, final); md.classList.toggle("cursor", !final); }
+      else md.innerHTML = final ? "" : `<div class="thinking"><i></i><i></i><i></i></div>`;
+      $(".extra", el).innerHTML =
+        run.notices.map(n => `<div class="notice">${icon("i-alert")}<div>${esc(n)}</div></div>`).join("") +
+        (run.error ? `<div class="err-box">${icon("i-alert")}<div>${esc(run.error)}</div></div>` : "");
+      $(".run-foot", el).hidden = !(final && run.native);
+    }
+
+    async function agentRun(task, resumeFrom) {
+      task = (task || "").trim();
+      if (!task || S.agentBusy) return;
+      if (!modelInfo(S.model)?.available) { toast("Pick an available model first", "err"); return; }
+      const dir = $("#agent-dir").value.trim();
+      store.set("agentDir", dir);
+
+      const run = { task, model: S.model, tools: [], notices: [], content: "", native: null };
+      $("#runs").prepend(runCard(run));
+      paintRun(run, false);
+      const btn = $("#agent-run");
+      btn.disabled = true;
+      const ctrl = new AbortController();
+      S.agentBusy = ctrl;
+      const t0 = performance.now();
+      let raf = 0;
+      const schedule = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; paintRun(run, false); }); };
+
+      const body = {
+        task, model: S.model, working_dir: dir || null, effort: S.effort || null,
+        resume: resumeFrom?.native || null,
+      };
+      if (provOf(S.model) === "claude" && agentToolSel) body.tools = [...agentToolSel];
+
+      try {
+        await streamSSE("/agent/task/stream", body, ev => {
+          switch (ev.type) {
+            case "session": run.dir = ev.working_dir; break;
+            case "text": run.content += ev.content; break;
+            case "tool_use": {
+              const t = run.tools.find(x => x.id === ev.id);
+              if (t) { if (ev.detail) t.detail = ev.detail; } else run.tools.push({ id: ev.id, name: ev.name, detail: ev.detail || "", ok: null });
+              break;
+            }
+            case "tool_result": { const t = run.tools.find(x => x.id === ev.id); if (t) { t.ok = ev.ok; t.error = ev.content; } break; }
+            case "notice": run.notices.push(ev.content); break;
+            case "error": run.error = ev.content; break;
+            case "result": run.native = ev.native_session_id || null; break;
+          }
+          schedule();
+        }, ctrl.signal);
+      } catch (e) {
+        run.error = e.name === "AbortError" ? "Stopped." : (e.message || String(e));
+      } finally {
+        if (raf) cancelAnimationFrame(raf);
+        run.total = performance.now() - t0;
+        run.tools.forEach(t => { if (t.ok === null) t.ok = !run.error; });
+        S.agentBusy = null; btn.disabled = false;
+        paintRun(run, true);
+        run.el.querySelector("[data-act=agent-continue]").onclick = () => {
+          const inp = run.el.querySelector(".run-foot input");
+          agentRun(inp.value, run);
+        };
+      }
+    }
+
+    /* ================================================================
+       API docs view
+       ================================================================ */
+    const ENDPOINTS = [
+      ["GET", "/health", "Server + provider status"],
+      ["GET", "/models", "All models; each has a unique key like claude:claude-sonnet-5"],
+      ["POST", "/chat", "Chat, full JSON response"],
+      ["POST", "/chat/stream", "Chat as Server-Sent Events (text, tool_use, result, done…)"],
+      ["POST", "/agent/task", "Agent task in a folder (reads/edits files)"],
+      ["GET", "/auth/accounts", "Overview of Claude and Antigravity accounts & tokens"],
+      ["GET", "/auth/tokens", "Extract access and refresh tokens (?reveal=true for unmasked)"],
+      ["POST", "/auth/login", "Launch interactive authentication window for Claude or Antigravity"],
+      ["POST", "/auth/refresh", "Refresh OAuth access & refresh tokens from local accounts"],
+      ["GET", "/sessions", "Warm conversation processes per provider"],
+      ["DELETE", "/sessions/{id}", "Close a warm conversation"],
+      ["GET", "/v1/models", "OpenAI-compatible model list"],
+      ["POST", "/v1/chat/completions", "OpenAI-compatible chat (stream or not)"],
+    ];
+
+    function snippet(kind) {
+      const base = serverUrl();
+      const model = S.model || "claude:claude-sonnet-5";
+      const key = S.health?.auth_required ? "YOUR_API_KEY" : null;
+      const authCurl = key ? ` \\\n  -H "Authorization: Bearer ${key}"` : "";
+      const authPy = key ? `, headers={"Authorization": "Bearer ${key}"}` : "";
+      const authJs = key ? `,\n    "Authorization": "Bearer ${key}"` : "";
+      switch (kind) {
+        case "curl": return ["bash", `curl ${base}/chat \\
+  -H "Content-Type: application/json"${authCurl} \\
+  -d '{
+    "model": "${model}",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "session_id": "my-chat-1"
+  }'`];
+        case "python": return ["python", `import requests
+
+r = requests.post("${base}/chat", json={
+    "model": "${model}",
+    "messages": [{"role": "user", "content": "Explain recursion in one paragraph."}],
+    "session_id": "my-chat-1",   # optional: keeps the conversation warm
+}${authPy})
+print(r.json()["content"])`];
+        case "stream": return ["python", `import json, requests
+
+with requests.post("${base}/chat/stream", json={
+    "model": "${model}",
+    "messages": [{"role": "user", "content": "Write a haiku about APIs."}],
+}${authPy}, stream=True) as r:
+    for line in r.iter_lines(decode_unicode=True):
+        if not line.startswith("data: "):
+            continue
+        ev = json.loads(line[6:])
+        if ev["type"] == "text":
+            print(ev["content"], end="", flush=True)
+        elif ev["type"] == "error":
+            print("\\nerror:", ev["content"])`];
+        case "openai": return ["python", `from openai import OpenAI
+
+client = OpenAI(base_url="${base}/v1", api_key="${key || "not-needed"}")
+
+stream = client.chat.completions.create(
+    model="${model}",
+    messages=[{"role": "user", "content": "Hello!"}],
+    stream=True,
+)
+for chunk in stream:
+    print(chunk.choices[0].delta.content or "", end="")`];
+        case "js": return ["javascript", `const res = await fetch("${base}/chat", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"${authJs}
+  },
+  body: JSON.stringify({
+    model: "${model}",
+    messages: [{ role: "user", content: "Hello!" }],
+  }),
+});
+const data = await res.json();
+console.log(data.content);`];
+      }
+    }
+
+    function renderApi() {
+      $("#base-url").value = serverUrl();
+      $("#docs-link").href = serverUrl() + "/docs";
+      const [lang, code] = snippet(S.snip);
+      renderMarkdown($("#snippet"), "```" + lang + "\n" + code + "\n```", true);
+      $("#endpoints").innerHTML = ENDPOINTS.map(([v, p, d]) =>
+        `<tr><td><span class="verb ${v}">${v}</span></td><td><code>${esc(p)}</code><div style="color:var(--muted);font-size:12.5px;margin-top:2px">${esc(d)}</div></td></tr>`).join("");
+    }
+
+    /* ================================================================
+       status view
+       ================================================================ */
+    async function renderStatus() {
+      try { await loadHealth(); } catch (e) { toast(e.message, "err"); return; }
+      const h = S.health;
+
+      // Render accounts & tokens
+      const accEl = $("#status-accounts");
+      if (accEl) {
+        try {
+          const authData = await api(`/auth/tokens?reveal=${S.revealTokens ? "true" : "false"}`);
+          const c = authData.claude || {};
+          const a = authData.antigravity || {};
+
+          accEl.innerHTML = `
+        <div class="card" style="margin:0;background:var(--card-sub, var(--bg-hover))">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+            <h3 style="margin:0;display:flex;align-items:center;gap:8px">${pmark("claude")}Claude Code
+              <span class="pill ${c.logged_in ? "ok" : "off"}">${c.logged_in ? "Signed in" : "Not signed in"}</span>
+            </h3>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <button class="btn sm" data-manual-token="claude" title="Enter / Paste Claude Tokens Manually"><svg class="i sm"><use href="#i-key"/></svg>Manual</button>
+              <button class="btn sm" data-refresh-auth="claude" title="Refresh Claude Token"><svg class="i sm"><use href="#i-refresh"/></svg></button>
+              <button class="btn sm primary" data-login="claude"><svg class="i sm"><use href="#i-play"/></svg>Authenticate Claude</button>
+            </div>
+          </div>
+          <dl class="kv">
+            <dt>Account</dt><dd><b>Claude ${esc((c.subscription || "pro").toUpperCase())}</b>${c.email ? ` &lt;${esc(c.email)}&gt;` : ""}</dd>
+            <dt>Rate tier</dt><dd>${esc(c.rate_limit_tier || "default")}</dd>
+            <dt>Access token</dt><dd style="word-break:break-all"><code class="mono" style="font-size:11px">${esc(c.access_token || "—")}</code>
+              ${c.access_token ? `<button class="btn sm" style="margin-left:6px;padding:2px 7px;font-size:11px" data-copy-val="${esc(c.access_token)}">Copy</button>` : ""}
+            </dd>
+            <dt>Access expiry</dt><dd>${esc(c.access_token_expires_in || "unknown")} ${c.access_token_is_expired ? '<span class="pill err" style="margin-left:4px">expired</span>' : ""}</dd>
+            <dt>Refresh token</dt><dd style="word-break:break-all"><code class="mono" style="font-size:11px">${esc(c.refresh_token || "—")}</code>
+              ${c.refresh_token ? `<button class="btn sm" style="margin-left:6px;padding:2px 7px;font-size:11px" data-copy-val="${esc(c.refresh_token)}">Copy</button>` : ""}
+            </dd>
+            <dt>Refresh expiry</dt><dd>${esc(c.refresh_token_expires_in || "unknown")}</dd>
+          </dl>
+        </div>
+
+        <div class="card" style="margin:0;background:var(--card-sub, var(--bg-hover))">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+            <h3 style="margin:0;display:flex;align-items:center;gap:8px">${pmark("antigravity")}Antigravity
+              <span class="pill ${a.logged_in ? "ok" : "off"}">${a.logged_in ? "Signed in" : "Not signed in"}</span>
+            </h3>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <button class="btn sm" data-manual-token="antigravity" title="Enter / Paste Antigravity Tokens Manually"><svg class="i sm"><use href="#i-key"/></svg>Manual</button>
+              <button class="btn sm" data-refresh-auth="antigravity" title="Refresh Antigravity Token"><svg class="i sm"><use href="#i-refresh"/></svg></button>
+              <button class="btn sm primary" data-login="antigravity"><svg class="i sm"><use href="#i-play"/></svg>Authenticate Antigravity</button>
+            </div>
+          </div>
+          <dl class="kv">
+            <dt>Account</dt><dd><b>${esc(a.name || "User")}</b> &lt;${esc(a.email || "unknown")}&gt;</dd>
+            <dt>Plan tier</dt><dd><span class="pill ok">${esc(a.subscription || "Google AI Pro")}</span></dd>
+            <dt>Access token</dt><dd style="word-break:break-all"><code class="mono" style="font-size:11px">${esc(a.access_token || "—")}</code>
+              ${a.access_token ? `<button class="btn sm" style="margin-left:6px;padding:2px 7px;font-size:11px" data-copy-val="${esc(a.access_token)}">Copy</button>` : ""}
+            </dd>
+            <dt>Refresh token</dt><dd style="word-break:break-all"><code class="mono" style="font-size:11px">${esc(a.refresh_token || "—")}</code>
+              ${a.refresh_token ? `<button class="btn sm" style="margin-left:6px;padding:2px 7px;font-size:11px" data-copy-val="${esc(a.refresh_token)}">Copy</button>` : ""}
+            </dd>
+            <dt>API key</dt><dd style="word-break:break-all"><code class="mono" style="font-size:11px">${esc(a.api_key || "—")}</code>
+              ${a.api_key ? `<button class="btn sm" style="margin-left:6px;padding:2px 7px;font-size:11px" data-copy-val="${esc(a.api_key)}">Copy</button>` : ""}
+            </dd>
+          </dl>
+        </div>
+      `;
+        } catch (e) {
+          accEl.innerHTML = `<div class="empty-note">Failed to load account auth: ${esc(e.message)}</div>`;
+        }
+      }
+
+      $("#status-providers").innerHTML = Object.values(h.providers).map(p => {
+        const n = S.models.filter(m => m.provider === p.id).length;
+        return `<div class="card">
+      <h2>${pmark(p.id)}${esc(p.label)}
+        <span class="pill ${p.available ? "ok" : "off"}" style="margin-left:auto">${p.available ? "connected" : p.enabled ? "not found" : "disabled"}</span></h2>
+      <dl class="kv">
+        <dt>Binary</dt><dd>${esc(p.binary || "—")}</dd>
+        ${"logged_in" in p ? `<dt>Signed in</dt><dd>${p.logged_in ? "yes" : "no — click Authenticate above to sign in"}</dd>` : ""}
+        <dt>Models</dt><dd>${n}${p.models_source ? ` (from ${esc(p.models_source)})` : ""}</dd>
+        <dt>Effort levels</dt><dd>${esc(p.efforts.join(", "))}</dd>
+      </dl></div>`;
+      }).join("");
+
+
+      const el = $("#status-sessions");
+      try {
+        const data = await api("/sessions");
+        const rows = [];
+        for (const [pid, st] of Object.entries(data)) {
+          for (const s of st.sessions) rows.push({ pid, ...s });
+        }
+        const spares = Object.entries(data).map(([pid, st]) => `${provLabel(pid)}: ${st.warm_spares} spare`).join(" · ");
+        el.innerHTML = (rows.length ? `<table class="sessions"><tr><th>Provider</th><th>Session</th><th>Model</th><th>Turns</th><th>Idle</th><th></th></tr>
+      ${rows.map(r => `<tr><td>${esc(provLabel(r.pid))}</td><td class="mono">${esc(r.id.slice(0, 18))}</td><td class="mono">${esc(r.model)}</td>
+        <td>${r.turns}</td><td>${r.busy ? '<span class="pill neutral">busy</span>' : fmtMs(r.idle_seconds * 1000)}</td>
+        <td style="text-align:right"><button class="btn sm" data-drop="${esc(r.id)}">Close</button></td></tr>`).join("")}</table>`
+          : `<div class="empty-note">No warm conversations right now.</div>`)
+          + `<div class="empty-note">Pre-spawned processes ready for new chats — ${esc(spares || "none")}</div>`;
+      } catch (e) { el.innerHTML = `<div class="empty-note">${esc(e.message)}</div>`; }
+
+      $("#status-server").innerHTML = `
+    <dt>Version</dt><dd>${esc(h.version)}</dd>
+    <dt>Default model</dt><dd>${esc(h.default_model || "—")}</dd>
+    <dt>Auth</dt><dd>${h.auth_required ? "API key required" : "open (no API_KEY set)"}</dd>
+    <dt>Agent shell</dt><dd>${h.agent.shell_enabled ? "ENABLED" : "off"}</dd>
+    <dt>Agent folder</dt><dd>${esc(h.agent.working_dir)}</dd>
+    <dt>Smooth stream</dt><dd>${h.smooth_stream ? "on" : "off"}</dd>`;
+    }
+
+    /* ================================================================
+       views, settings, auth, theme
+       ================================================================ */
+    const TITLES = { chat: "Chat", agent: "Agent", api: "API & Docs", status: "Status & Accounts" };
+    function setView(v) {
+      S.view = v;
+      $$(".view").forEach(x => x.classList.toggle("active", x.id === "view-" + v));
+      $$(".nav button").forEach(b => b.classList.toggle("active", b.dataset.view === v));
+      $("#view-title").textContent = TITLES[v];
+      $("#app").classList.remove("nav-open");
+      history.replaceState(null, "", v === "chat" ? location.pathname : "#" + v);
+      if (v === "status") renderStatus();
+      if (v === "api") renderApi();
+      if (v === "agent") renderAgentForm();
+    }
+
+    function openSettings() {
+      $("#set-base").value = store.get("apiBase", "");
+      $("#set-base").placeholder = S.base ? `Auto: ${S.base}` : "Same as this page";
+      $("#set-key").value = S.key;
+      $("#set-system").value = S.system;
+      $("#set-session").checked = S.useSession;
+      $("#settings-modal").classList.add("show");
+    }
+    function saveSettings() {
+      S.key = $("#set-key").value.trim(); store.set("key", S.key);
+      S.system = $("#set-system").value; store.set("system", S.system);
+      S.useSession = $("#set-session").checked; store.set("useSession", S.useSession);
+      store.set("apiBase", $("#set-base").value.trim());
+      S.base = defaultBase();
+      renderMemoryChip();
+      $("#settings-modal").classList.remove("show");
+      toast("Settings saved");
+      boot();
+    }
+
+    function showAuth() {
+      if ($("#auth-modal").classList.contains("show")) return;
+      $("#auth-modal").classList.add("show");
+      setTimeout(() => $("#auth-key").focus(), 20);
+    }
+    async function submitAuth() {
+      const k = $("#auth-key").value.trim();
+      try {
+        const r = await fetch(S.base + "/auth/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k }) });
+        if (!r.ok) throw new Error();
+        S.key = k; store.set("key", k);
+        $("#auth-modal").classList.remove("show");
+        toast("Unlocked");
+        boot();
+      } catch { toast("That key is not valid", "err"); }
+    }
+
+    function applyTheme(t) {
+      document.documentElement.dataset.theme = t;
+      $("#theme-icon").innerHTML = `<use href="#i-${t === "light" ? "moon" : "sun"}"/>`;
+      $("#hljs-theme").href = `https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github${t === "light" ? "" : "-dark"}.min.css`;
+    }
+
+    /* ================================================================
+       events
+       ================================================================ */
+    document.addEventListener("click", e => {
+      const t = e.target.closest("[data-act],[data-view],[data-conv],[data-model],[data-suggest],[data-snip],[data-tool],[data-drop],[data-copy-from],[data-copy-val],[data-login],[data-manual-token],[data-refresh-auth]");
+      if (!t) {
+        if (!e.target.closest("#model-pop")) toggleModelPop(false);
+        return;
+      }
+      if (!t.closest("#model-pop") && t.dataset.act !== "models") toggleModelPop(false);
+
+      const del = e.target.closest("[data-del]");
+      if (del) { e.stopPropagation(); deleteConv(del.dataset.del); return; }
+      if (t.dataset.view) return setView(t.dataset.view);
+      if (t.dataset.conv) return openConv(t.dataset.conv);
+      if (t.dataset.model) return pickModel(t.dataset.model);
+      if (t.dataset.suggest) { $("#prompt").value = t.dataset.suggest; autosize(); updateSend(); $("#prompt").focus(); return; }
+      if (t.dataset.snip) { S.snip = t.dataset.snip; $$("#snip-tabs button").forEach(b => b.classList.toggle("active", b === t)); renderApi(); return; }
+      if (t.dataset.tool) {
+        agentToolSel.has(t.dataset.tool) ? agentToolSel.delete(t.dataset.tool) : agentToolSel.add(t.dataset.tool);
+        renderAgentForm(); return;
+      }
+      if (t.dataset.drop) { api("/sessions/" + encodeURIComponent(t.dataset.drop), { method: "DELETE" }).then(renderStatus).catch(err => toast(err.message, "err")); return; }
+      if (t.dataset.copyFrom) return copyText($("#" + t.dataset.copyFrom).value, t);
+      if (t.dataset.copyVal) return copyText(t.dataset.copyVal, t);
+
+      if (t.dataset.login) {
+        const prov = t.dataset.login;
+        if (prov === "claude") {
+          toast("Generating Claude OAuth authorization session...");
+          api("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider: "claude" }),
+          }).then(res => {
+            const info = res.claude || {};
+            S.activeClaudeState = info.state || "";
+            const authUrl = info.redirect_url || "https://claude.ai/login";
+            window.open(authUrl, "_blank");
+            const reopenLink = $("#claude-oauth-reopen");
+            if (reopenLink) reopenLink.href = authUrl;
+            $("#inp-claude-oauth-code").value = "";
+            $("#claude-oauth-modal").classList.add("show");
+            setTimeout(() => $("#inp-claude-oauth-code").focus(), 150);
+          }).catch(err => toast(err.message, "err"));
+          return;
+        }
+
+        if (prov === "antigravity") {
+          toast("Starting Google Antigravity OAuth sign-in...");
+          api("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider: "antigravity" }),
+          }).then(res => {
+            const info = res.antigravity || {};
+            const authUrl = info.redirect_url;
+            if (!authUrl) {
+              toast("Failed to generate Google OAuth URL", "err");
+              return;
+            }
+            window.open(authUrl, "_blank");
+            toast("Choose your account in Google Sign-In...", "info");
+
+            let checks = 0;
+            const poller = setInterval(async () => {
+              checks++;
+              if (checks > 40) { clearInterval(poller); return; }
+              try {
+                const creds = await api("/auth/tokens");
+                if (creds.antigravity && creds.antigravity.logged_in && creds.antigravity.has_access_token) {
+                  clearInterval(poller);
+                  toast(`Google Antigravity connected as ${creds.antigravity.name || creds.antigravity.email}!`);
+                  renderStatus();
+                }
+              } catch (_) { }
+            }, 2000);
+          }).catch(err => toast(err.message, "err"));
+          return;
+        }
+        return;
+      }
+
+      if (t.dataset.manualToken) {
+        const prov = t.dataset.manualToken;
+        S.activeManualProv = prov;
+        $("#token-edit-heading").textContent = `Update ${provLabel(prov)} Tokens`;
+        $("#token-edit-sub").textContent = prov === "claude"
+          ? "Paste your active accessToken and refreshToken for Claude Code."
+          : "Paste your API Key or OAuth tokens for Antigravity.";
+        $("#field-tok-access").style.display = "block";
+        $("#field-tok-refresh").style.display = prov === "claude" ? "block" : "none";
+        $("#field-tok-api-key").style.display = prov === "antigravity" ? "block" : "none";
+        $("#inp-access-tok").value = "";
+        $("#inp-refresh-tok").value = "";
+        $("#inp-api-key").value = "";
+        $("#btn-open-provider-web").dataset.webProv = prov;
+        $("#token-edit-modal").classList.add("show");
+        return;
+      }
+
+      if (t.dataset.refreshAuth) {
+        const prov = t.dataset.refreshAuth;
+        toast(`Refreshing ${provLabel(prov)} tokens...`);
+        api("/auth/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: prov }),
+        }).then(() => {
+          toast("Tokens refreshed!");
+          renderStatus();
+        }).catch(err => toast(err.message, "err"));
+        return;
+      }
+
+      switch (t.dataset.act) {
+        case "new-chat": return newChat();
+        case "models": return toggleModelPop(undefined, t);
+        case "toggle-memory":
+          S.useSession = !S.useSession; store.set("useSession", S.useSession);
+          renderMemoryChip();
+          return toast(S.useSession ? "Memory on — follow-ups reuse the warm model process" : "Memory off — each message is stateless");
+        case "retry": return boot();
+        case "send": return S.busy ? S.busy.abort() : send();
+        case "regen": return regenerate();
+        case "copy-code": return copyText(t.closest(".code").querySelector("pre").innerText, t);
+        case "copy-msg": {
+          const idx = Number(t.closest(".msg").dataset.idx);
+          return copyText(activeConv()?.messages[idx]?.content || "", t);
+        }
+        case "agent-run": return agentRun($("#agent-task").value);
+        case "refresh-status": return renderStatus();
+        case "refresh-tokens": {
+          toast("Refreshing all accounts and tokens...");
+          api("/auth/refresh", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider: "all" }),
+          }).then(() => {
+            toast("All tokens refreshed!");
+            renderStatus();
+          }).catch(err => toast(err.message, "err"));
+          return;
+        }
+        case "toggle-tokens": {
+          S.revealTokens = !S.revealTokens;
+          const lbl = $("#token-toggle-label");
+          if (lbl) lbl.textContent = S.revealTokens ? "Mask Tokens" : "Show Tokens";
+          return renderStatus();
+        }
+        case "theme": {
+          const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+          store.set("theme", next); return applyTheme(next);
+        }
+        case "settings": return openSettings();
+        case "close-settings": return $("#settings-modal").classList.remove("show");
+        case "save-settings": return saveSettings();
+        case "close-token-edit": return $("#token-edit-modal").classList.remove("show");
+        case "open-provider-web": {
+          const prov = $("#btn-open-provider-web").dataset.webProv || S.activeManualProv || "claude";
+          const targetUrl = prov === "claude" ? "https://claude.ai/login" : "https://aistudio.google.com/apikey";
+          window.open(targetUrl, "_blank");
+          return;
+        }
+        case "save-manual-tokens": {
+          const prov = S.activeManualProv || "claude";
+          const access_token = $("#inp-access-tok").value.trim() || undefined;
+          const refresh_token = $("#inp-refresh-tok").value.trim() || undefined;
+          const api_key = $("#inp-api-key").value.trim() || undefined;
+          toast(`Saving ${provLabel(prov)} tokens...`);
+          api("/auth/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider: prov,
+              access_token,
+              refresh_token,
+              api_key,
+            }),
+          }).then(() => {
+            toast(`${provLabel(prov)} tokens saved successfully!`);
+            $("#token-edit-modal").classList.remove("show");
+            renderStatus();
+          }).catch(err => toast(err.message, "err"));
+          return;
+        }
+        case "close-claude-oauth": return $("#claude-oauth-modal").classList.remove("show");
+        case "submit-claude-oauth": {
+          const code = $("#inp-claude-oauth-code").value.trim();
+          if (!code) return toast("Please enter the authorization code", "err");
+          toast("Exchanging authorization code and saving tokens...");
+          api("/auth/exchange", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider: "claude", code: code, state: S.activeClaudeState || undefined }),
+          }).then(() => {
+            toast("Claude authenticated successfully! Tokens updated.");
+            $("#claude-oauth-modal").classList.remove("show");
+            renderStatus();
+          }).catch(err => toast(err.message, "err"));
+          return;
+        }
+        case "close-antigravity-auth": return $("#antigravity-auth-modal").classList.remove("show");
+        case "save-antigravity-auth": {
+          const k = $("#inp-antigravity-api-key").value.trim();
+          if (k) {
+            toast("Saving Antigravity API key...");
+            api("/auth/save", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ provider: "antigravity", api_key: k }),
+            }).then(() => {
+              toast("Antigravity API key saved!");
+              $("#antigravity-auth-modal").classList.remove("show");
+              renderStatus();
+            }).catch(err => toast(err.message, "err"));
+          } else {
+            $("#antigravity-auth-modal").classList.remove("show");
+          }
+          return;
+        }
+        case "clear-all":
+          if (confirm("Delete all conversations in this browser?")) {
+            S.convs.forEach(c => c.sid && api("/sessions/" + encodeURIComponent(c.sid), { method: "DELETE" }).catch(() => { }));
+            S.convs = []; S.activeId = null; saveConvs(); renderConvs(); renderMessages(); renderHero();
+            $("#settings-modal").classList.remove("show");
+          }
+          return;
+        case "auth-submit": return submitAuth();
+        case "open-nav": return $("#app").classList.add("nav-open");
+        case "close-nav": return $("#app").classList.remove("nav-open");
+      }
+
+    });
+
+    $("#prompt").addEventListener("input", () => { autosize(); updateSend(); });
+    $("#prompt").addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+    });
+    $("#agent-task").addEventListener("keydown", e => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); agentRun($("#agent-task").value); }
+    });
+    $("#auth-key").addEventListener("keydown", e => { if (e.key === "Enter") submitAuth(); });
+    $("#inp-claude-oauth-code")?.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        const btn = $("[data-act='submit-claude-oauth']");
+        if (btn) btn.click();
+      }
+    });
+    $("#inp-antigravity-api-key")?.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        const btn = $("[data-act='save-antigravity-auth']");
+        if (btn) btn.click();
+      }
+    });
+    $$(".effort-select").forEach(sel => sel.addEventListener("change", e => {
+      S.effort = e.target.value; store.set("effort", S.effort);
+      $$(".effort-select").forEach(s => (s.value = S.effort));
+    }));
+
+    window.addEventListener("message", ev => {
+      if (ev.data && ev.data.type === "antigravity_auth_success") {
+        const who = ev.data.name ? `${ev.data.name} (${ev.data.email})` : (ev.data.email || "Google Account");
+        toast(`Google Antigravity authenticated as ${who}!`);
+        renderStatus();
+      }
+    });
+    addEventListener("resize", () => toggleModelPop(false));
+    $("#model-search").addEventListener("input", renderModelList);
+    $("#model-search").addEventListener("keydown", e => {
+      const items = $$("#model-list .pop-item:not(:disabled)");
+      if (!items.length) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        popIndex = (popIndex + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+        items.forEach((it, i) => it.classList.toggle("kb", i === popIndex));
+        items[popIndex].scrollIntoView({ block: "nearest" });
+      } else if (e.key === "Enter") {
+        e.preventDefault(); pickModel((items[popIndex] || items[0]).dataset.model);
+      }
+    });
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") {
+        toggleModelPop(false);
+        $("#settings-modal").classList.remove("show");
+        $("#app").classList.remove("nav-open");
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "o") { e.preventDefault(); newChat(); }
+    });
+    $$(".overlay").forEach(o => o.addEventListener("click", e => {
+      if (e.target === o && o.id !== "auth-modal") o.classList.remove("show");
+    }));
+
+    /* ================================================================
+       boot
+       ================================================================ */
+    async function boot() {
+      let st;
+      try {
+        st = await fetch(S.base + "/auth/status").then(r => r.json());
+      } catch {
+        // Network failure: the backend is not running (or the URL is wrong).
+        S.offline = true;
+        renderConn(); renderModelButton(); renderHero(); renderFootNote();
+        return;
+      }
+      try {
+        if (st.auth_required && !S.key) { showAuth(); return; }
+        await loadHealth();
+        const v = location.hash.slice(1);
+        if (TITLES[v] && v !== S.view) setView(v);
+      } catch (e) {
+        toast("Server error: " + e.message, "err");
+      }
+    }
+
+    applyTheme(store.get("theme", window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark"));
+    renderConvs();
+    renderMessages();
+    renderHero();
+    renderMemoryChip();
+    renderModelButton();
+    autosize();
+    boot();
+  </script>
+</body>
+
+</html>
