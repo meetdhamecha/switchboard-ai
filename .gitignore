@@ -4,3 +4,7 @@ __pycache__/
 venv/
 test_report_*.json
 *.log
+.venv/
+dist/
+build/
+*.egg-info/

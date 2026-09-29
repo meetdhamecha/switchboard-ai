@@ -15,7 +15,9 @@ from dotenv import load_dotenv
 
 PKG_DIR = Path(__file__).resolve().parent
 
-for _env_path in (PKG_DIR / ".env", PKG_DIR.parent / ".env"):
+# .env in the current directory (pip installs), else the repository root /
+# package folder (running from a clone).
+for _env_path in (Path.cwd() / ".env", PKG_DIR.parent / ".env", PKG_DIR / ".env"):
     if _env_path.exists():
         load_dotenv(_env_path)
         break

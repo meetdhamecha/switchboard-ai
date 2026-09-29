@@ -1,0 +1,54 @@
+ [build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# Distribution name on PyPI ("pip install switchboard-router"). "switchboard-ai"
+# is already taken there; the import name stays switchboard_ai.
+name = "switchboard-router"
+dynamic = ["version"]
+description = "Smart router for AI models: auto-routing to the cheapest capable model, failover, multi-model orchestration and an OpenAI-compatible API."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Meet Dhamecha" }]
+keywords = ["llm", "ai", "router", "gateway", "claude", "gemini", "openai-compatible", "orchestration", "cost-optimization"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+# Official Claude API provider (set SWITCHBOARD_ANTHROPIC_API_KEY in .env).
+api = ["anthropic>=1.8.0"]
+# Model test runner (test_models.py in the repository).
+test = ["httpx>=0.27"]
+
+[project.scripts]
+switchboard-ai = "switchboard_ai.main:main"
+
+[project.urls]
+Repository = "https://github.com/meetdhamecha/switchboard-ai"
+Issues = "https://github.com/meetdhamecha/switchboard-ai/issues"
+
+[tool.setuptools.dynamic]
+version = { attr = "switchboard_ai.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["switchboard_ai*"]
+
+[tool.setuptools.package-data]
+switchboard_ai = ["static/*"]

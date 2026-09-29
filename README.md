@@ -11,25 +11,36 @@ Switchboard AI works with **both, either one, or neither**. It finds whatever is
 
 📖 **New here?** Read [HOW_IT_WORKS.md](HOW_IT_WORKS.md) first. It explains the whole workflow as a simple story, with a step-by-step Postman guide.
 
-This replaces `claude_master_api` and `antigravity_master_api`. It is self-contained and imports neither of them.
-
 ---
+
+## Install
+
+From PyPI:
+
+```bash
+pip install switchboard-router            # core
+pip install "switchboard-router[api]"     # + official Claude API provider
+```
+
+From a clone of this repository (editable: code changes apply without reinstalling):
+
+```bash
+git clone https://github.com/meetdhamecha/switchboard-ai.git
+cd switchboard-ai
+pip install -e ".[api,test]"
+```
+
+On Windows you can also double-click `start.bat`, which creates a virtual environment on first run.
 
 ## Quick start
 
-```bat
-:: double-click, or:
-switchboard_ai\start.bat
-```
-
-Or by hand, from the folder that **contains** `switchboard_ai`:
-
 ```bash
-pip install -r switchboard_ai/requirements.txt
-python -m switchboard_ai status      # what was found?
-python -m switchboard_ai server      # http://localhost:8000
-python -m switchboard_ai ask "hello" --model gemini-3.8-flash-high
+switchboard-ai status      # what was found?
+switchboard-ai server      # http://localhost:8000
+switchboard-ai ask "hello" --model gemini-3.8-flash-high
 ```
+
+`python -m switchboard_ai …` works the same way. Settings are read from a `.env` file in the current folder; copy `.env.example` to start.
 
 > **Backend and frontend are one process.** The server hosts the UI itself, so there is no separate frontend to start. Always open **http://localhost:8000**.
 > If you open `static/index.html` some other way (VS Code Live Server, or double-clicking the file), the page still talks to `http://localhost:8000`, but the server must be running. You can change the backend address under **Settings → Backend URL**.
