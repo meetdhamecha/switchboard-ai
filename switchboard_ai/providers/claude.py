@@ -21,7 +21,7 @@ import json
 from typing import AsyncGenerator, Optional
 
 from switchboard_ai import config
-from switchboard_ai.discovery import claude_logged_in, find_claude_binaries, resolve
+from switchboard_ai.discovery import find_claude_binaries, resolve
 from switchboard_ai.process import Msg, SessionPool, run_once
 from switchboard_ai.providers.base import UUID_RE, Provider, chat_system_prompt, tool_detail
 

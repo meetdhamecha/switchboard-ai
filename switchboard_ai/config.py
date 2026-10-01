@@ -79,7 +79,13 @@ API_PORT: int = int(os.getenv("API_PORT", "8000"))
 # Empty = open access. Set it before exposing the server beyond localhost.
 API_KEY: str = os.getenv("API_KEY", "").strip()
 
-CORS_ORIGINS: list[str] = _csv("CORS_ORIGINS", "*")
+# Web pages on other origins that may call this server from a browser. Empty =
+# only the built-in UI (same origin). Never "*" without API_KEY: any website
+# you visit could then read your tokens and run agent tasks.
+CORS_ORIGINS: list[str] = _csv("CORS_ORIGINS", "")
+# Host names the server answers to. Empty = this machine only (localhost,
+# 127.0.0.1, [::1]) when API_HOST is a loopback address, else any.
+TRUSTED_HOSTS: list[str] = [h.lower() for h in _csv("TRUSTED_HOSTS", "")]
 
 # Preferred default model. If its provider is missing, the first model of
 # whichever provider IS available is used instead.

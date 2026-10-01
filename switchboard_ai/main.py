@@ -3,6 +3,7 @@ switchboard_ai.main
 ───────────────
     python -m switchboard_ai server [--host H] [--port P]
     python -m switchboard_ai status
+    python -m switchboard_ai setup [--yes] [--update] [--check] [--only claude|antigravity]
     python -m switchboard_ai ask "question" [--model M]
 """
 
@@ -143,6 +144,13 @@ def main() -> None:
 
     sub.add_parser("status", help="Show which providers were found")
 
+    st = sub.add_parser("setup", help="Find the provider CLIs and install missing ones")
+    st.add_argument("--yes", "-y", action="store_true", help="Install without asking")
+    st.add_argument("--update", action="store_true", help="Reinstall to get the latest version")
+    st.add_argument("--check", action="store_true", help="Only report, install nothing")
+    st.add_argument("--only", action="append", choices=["claude", "antigravity"],
+                    help="Limit to one provider (repeatable)")
+
     auth_p = sub.add_parser("auth", help="Show account auth and token details")
     auth_p.add_argument("--reveal", action="store_true", help="Show full unmasked tokens")
     auth_p.add_argument("--refresh", action="store_true", help="Force refresh tokens")
@@ -166,6 +174,9 @@ def main() -> None:
                     log_level="warning", backlog=2048, timeout_keep_alive=30)
     elif args.command == "status":
         _status()
+    elif args.command == "setup":
+        from switchboard_ai.installer import run_setup
+        sys.exit(run_setup(args.only, args.yes, args.update, args.check))
     elif args.command == "auth":
         _auth(reveal=args.reveal, refresh=args.refresh)
     elif args.command == "ask":

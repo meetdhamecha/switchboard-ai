@@ -65,9 +65,13 @@ def _banner() -> None:
         print(f"  {p.label:<13}: {state:<10} {p.binary or ''}")
     print(f"  Default      : {f'{dp.id}:{dm}' if dp else '— no provider available —'}")
     print(f"  Auth         : {'API key required' if config.API_KEY else 'OPEN (no API_KEY set)'}")
+    if "*" in config.CORS_ORIGINS and not config.API_KEY:
+        print("  WARNING      : CORS_ORIGINS=* with no API_KEY lets any website use this server")
     print(f"  Agent shell  : {'ENABLED' if config.AGENT_ALLOW_SHELL else 'off'}")
     print(f"  UI           : http://{host}:{config.API_PORT}/")
     print(f"  Docs         : http://{host}:{config.API_PORT}/docs")
+    if any(p.enabled and not p.available for p in registry.providers.values()):
+        print("  Missing a provider? Run `switchboard-ai setup` to install it.")
     print("=" * 64 + "\n")
 
 
@@ -111,6 +115,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+_LOOPBACK = ("127.0.0.1", "localhost", "::1")
+
+
+def _allowed_hosts() -> list[str]:
+    if config.TRUSTED_HOSTS:
+        return config.TRUSTED_HOSTS
+    return ["localhost", "127.0.0.1", "[::1]"] if config.API_HOST in _LOOPBACK else []
+
+
+@app.middleware("http")
+async def _block_other_sites(request: Request, call_next):
+    """Stop other websites from using this server through the user's browser:
+    unknown Host names (DNS rebinding) and requests from pages on another
+    origin (CSRF) are refused unless CORS_ORIGINS allows that origin."""
+    host = (request.headers.get("host") or "").lower()
+    name = host.split("]")[0] + "]" if host.startswith("[") else host.rsplit(":", 1)[0]
+    hosts = _allowed_hosts()
+    if hosts and name not in hosts:
+        return JSONResponse(status_code=403, content={"detail": f"Host not allowed: {name}. Set TRUSTED_HOSTS in .env."})
+    origin = request.headers.get("origin")
+    if (origin and "*" not in config.CORS_ORIGINS and origin not in config.CORS_ORIGINS
+            and origin.lower() != f"{request.url.scheme}://{host}"):
+        return JSONResponse(status_code=403, content={
+            "detail": f"Requests from {origin} are blocked. Add it to CORS_ORIGINS in .env to allow it."})
+    return await call_next(request)
 
 
 @app.exception_handler(RoutingError)
@@ -375,6 +406,68 @@ def auth_login(body: ProviderTargetBody, request: Request):
     if not results:
         raise HTTPException(400, f"Unknown provider: {body.provider}")
     return results
+
+
+def _agy_provider() -> Provider:
+    p = registry.get("antigravity")
+    if not p or not p.available:
+        raise HTTPException(503, "The Antigravity CLI (agy) is not installed. Run `switchboard-ai setup`.")
+    return p
+
+
+@app.get("/auth/antigravity/cli", tags=["Auth"], dependencies=[Depends(require_key)])
+async def agy_cli_status(refresh: bool = False):
+    """Whether agy itself is signed in, and the state of a sign-in started here."""
+    from switchboard_ai.agy_auth import agy_auth
+    p = registry.get("antigravity")
+    if not p or not p.available:
+        return {"available": False}
+    return await agy_auth.status(p, refresh)
+
+
+@app.post("/auth/antigravity/cli/login", tags=["Auth"], dependencies=[Depends(require_key)])
+async def agy_cli_login():
+    """Open agy's sign-in and return the Google sign-in link for the browser."""
+    from switchboard_ai.agy_auth import agy_auth
+    return await agy_auth.start_login(_agy_provider())
+
+
+class AgyCodeBody(BaseModel):
+    code: str = Field(..., max_length=512, description="Authorization code Google showed after sign-in")
+
+
+@app.post("/auth/antigravity/cli/login/code", tags=["Auth"], dependencies=[Depends(require_key)])
+def agy_cli_login_code(body: AgyCodeBody):
+    """Pass the authorization code from Google's page to the sign-in in progress."""
+    from switchboard_ai.agy_auth import agy_auth
+    return agy_auth.submit_code(body.code)
+
+
+@app.post("/auth/antigravity/cli/login/cancel", tags=["Auth"], dependencies=[Depends(require_key)])
+def agy_cli_login_cancel():
+    from switchboard_ai.agy_auth import agy_auth
+    return agy_auth.cancel_login()
+
+
+@app.post("/auth/antigravity/cli/logout", tags=["Auth"], dependencies=[Depends(require_key)])
+async def agy_cli_logout():
+    """Run agy's /logout and stop the agy processes that used the old account."""
+    from switchboard_ai.agy_auth import agy_auth
+    return await agy_auth.logout(_agy_provider())
+
+
+class AgySetupBody(BaseModel):
+    accept_terms: bool = Field(False, description="The user agreed to the Antigravity CLI terms in the UI")
+    share_data: bool = Field(False, description="Let Google collect and use Interactions data")
+
+
+@app.post("/auth/antigravity/cli/setup", tags=["Auth"], dependencies=[Depends(require_key)])
+async def agy_cli_setup(body: AgySetupBody):
+    """Finish agy's one-time setup with the choices the user made in the UI."""
+    from switchboard_ai.agy_auth import agy_auth
+    if not body.accept_terms:
+        raise HTTPException(400, "The Antigravity CLI terms must be accepted to finish its setup.")
+    return await agy_auth.setup(_agy_provider(), body.share_data)
 
 
 @app.get("/auth/antigravity/callback", response_class=HTMLResponse, tags=["Auth"])

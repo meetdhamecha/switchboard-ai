@@ -9,7 +9,9 @@ Extracts:
     ~/.claude/.credentials.json.
   - Antigravity: Google OAuth access token (ya29...), refresh token (1//...),
     API key, user name, email, and subscription plan from the Antigravity
-    state database (%APPDATA%\\Antigravity\\User\\globalStorage\\state.vscdb).
+    state database (<app data>/Antigravity/User/globalStorage/state.vscdb, where
+    <app data> is %APPDATA% on Windows, ~/Library/Application Support on macOS
+    and ~/.config on Linux).
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ import re
 import secrets
 import sqlite3
 import subprocess
+import sys
 import time
 import urllib.parse
 
@@ -30,6 +33,18 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+
+def _write_private(path: Path, text: str) -> None:
+    """Write a credentials file readable only by the current user (0600)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    try:
+        os.chmod(path, 0o600)  # also tighten a file that already existed
+    except OSError:
+        pass
 
 
 def _encode_varint(n: int) -> bytes:
@@ -349,7 +364,11 @@ class ClaudeAuth:
             scopes_list = cls.SCOPES
 
         now_ms = int(time.time() * 1000)
-        data = {
+        try:  # keep whatever else Claude Code stores in this file
+            data = json.loads(cls.CREDENTIALS_PATH.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        data.update({
             "claudeAiOauth": {
                 "accessToken": access_token,
                 "refreshToken": refresh_token or "",
@@ -361,10 +380,9 @@ class ClaudeAuth:
             },
             "email": email or cls._cached_email,
             "organizationUuid": org_uuid,
-        }
+        })
 
-        cls.CREDENTIALS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        cls.CREDENTIALS_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        _write_private(cls.CREDENTIALS_PATH, json.dumps(data, indent=2))
         return cls.get_credentials(reveal=False)
 
     @classmethod
@@ -392,8 +410,7 @@ class ClaudeAuth:
         if subscription:
             oauth["subscriptionType"] = subscription.strip().lower()
 
-        cls.CREDENTIALS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        cls.CREDENTIALS_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        _write_private(cls.CREDENTIALS_PATH, json.dumps(data, indent=2))
         return cls.get_credentials(reveal=False)
 
     @classmethod
@@ -459,7 +476,7 @@ class ClaudeAuth:
         oauth["expiresAt"] = now_ms + int(expires_in * 1000)
         oauth["refreshTokenExpiresAt"] = now_ms + int(30 * 86400 * 1000)
 
-        cls.CREDENTIALS_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        _write_private(cls.CREDENTIALS_PATH, json.dumps(data, indent=2))
         return cls.get_credentials(reveal=False)
 
     @classmethod
@@ -493,6 +510,15 @@ class ClaudeAuth:
         return access_tok
 
 
+def _app_data_dir() -> Path:
+    """Where VS Code-based apps such as Antigravity keep their user data."""
+    if os.name == "nt":
+        return Path(os.getenv("APPDATA") or Path.home() / "AppData" / "Roaming")
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support"
+    return Path(os.getenv("XDG_CONFIG_HOME") or Path.home() / ".config")
+
+
 class AntigravityAuth:
     """Handles credentials and Google OAuth for Google Antigravity (agy.exe)."""
 
@@ -513,8 +539,8 @@ class AntigravityAuth:
     GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
     _STATE_DB_PATHS = [
-        Path(os.getenv("APPDATA", "")) / "Antigravity" / "User" / "globalStorage" / "state.vscdb",
-        Path(os.getenv("APPDATA", "")) / "Antigravity IDE" / "User" / "globalStorage" / "state.vscdb",
+        _app_data_dir() / app / "User" / "globalStorage" / "state.vscdb"
+        for app in ("Antigravity", "Antigravity IDE")
     ]
 
     _pending_oauth: dict[str, dict[str, Any]] = {}
@@ -697,11 +723,15 @@ class AntigravityAuth:
         verifier = None
         expected_redirect_uri = redirect_uri or "http://localhost:8000/auth/antigravity/callback"
 
-        if state and state in cls._pending_oauth:
-            saved = cls._pending_oauth.pop(state)
-            verifier = saved.get("verifier")
-            if saved.get("redirect_uri"):
-                expected_redirect_uri = saved["redirect_uri"]
+        # Only finish sign-ins started here: a code with an unknown state could
+        # come from someone else's account (login CSRF).
+        if not state or state not in cls._pending_oauth:
+            return {"ok": False, "logged_in": False,
+                    "error": "Unknown or expired sign-in. Click Authenticate Antigravity again."}
+        saved = cls._pending_oauth.pop(state)
+        verifier = saved.get("verifier")
+        if saved.get("redirect_uri"):
+            expected_redirect_uri = saved["redirect_uri"]
 
         token_payload = {
             "client_id": cls.GOOGLE_CLIENT_ID,
@@ -884,7 +914,12 @@ def get_all_auth_status(reveal: bool = False) -> dict[str, Any]:
     """Retrieve combined auth and token details for both providers."""
     return {
         "claude": ClaudeAuth.get_credentials(reveal=reveal),
-        "antigravity": AntigravityAuth.get_credentials(reveal=reveal),
+        "antigravity": {
+            **AntigravityAuth.get_credentials(reveal=reveal),
+            # The in-app Google login needs an OAuth client in .env; otherwise
+            # agy signs in on its own and the UI hides the button.
+            "login_configured": bool(AntigravityAuth.GOOGLE_CLIENT_ID),
+        },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

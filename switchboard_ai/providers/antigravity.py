@@ -52,6 +52,10 @@ def _tier(name: str) -> str:
     return m.group(1) if m else ""
 
 
+# Google out of capacity / rate limiting for a model.
+_CAPACITY_RE = re.compile(r"UNAVAILABLE|RESOURCE_EXHAUSTED|No capacity|\b(?:503|429)\b", re.I)
+
+
 def _parser():
     streamed_text = False
     turn_usage = {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0}
@@ -104,7 +108,16 @@ def _parser():
             out = []
             text = r.get("response") or ""
             if r.get("status") not in (None, "SUCCESS"):
-                out.append({"type": "error", "content": r.get("error") or f"agy status: {r.get('status')}"})
+                msg = r.get("error") or f"agy status: {r.get('status')}"
+                if streamed_text:
+                    # The answer already arrived; a later model call failed
+                    # (e.g. Google out of capacity). Not worth a red error.
+                    out.append({"type": "notice", "content": f"The answer finished, but agy then reported: {msg}"})
+                else:
+                    err = {"type": "error", "content": msg}
+                    if _CAPACITY_RE.search(msg):
+                        err["code"] = "rate_limited"  # lets routing fail over
+                    out.append(err)
             elif not streamed_text and text:
                 out.append({"type": "text", "content": text})
             for d in r.get("denied_actions") or []:
@@ -205,12 +218,24 @@ class AntigravityProvider(Provider):
         await self.refresh_models()
         await super().startup(warm_model)
 
+    async def reset_sessions(self) -> None:
+        """Drop every agy process after a sign-in or sign-out and reload the
+        model list for whichever account is signed in now."""
+        await self.shutdown()
+        await self.refresh_models()
+        if self.pool:
+            self.pool.reopen()
+            self.pool.start_reaper()
+
     def info(self) -> dict:
+        from switchboard_ai.agy_auth import agy_auth
         from switchboard_ai.auth import AntigravityAuth
         cred = AntigravityAuth.get_credentials(reveal=False)
+        # agy's own login once checked; until then the IDE's saved login.
+        cli = agy_auth.cached_signed_in
         return {
             **super().info(),
-            "logged_in": cred.get("logged_in", False),
+            "logged_in": cli if cli is not None else cred.get("logged_in", False),
             "models_source": self.models_source,
             "account": {
                 "name": cred.get("name"),
@@ -230,6 +255,24 @@ class AntigravityProvider(Provider):
         # agy has no per-tool allow flag: it is either "edits" (read + write
         # files, commands denied) or everything.
         return ["all tools"] if config.AGENT_ALLOW_SHELL else ["read & edit files"]
+
+    def chat(
+        self,
+        messages: list[Msg],
+        model: str,
+        session_id: Optional[str],
+        effort: Optional[str],
+    ) -> AsyncGenerator[dict, None]:
+        # agy has no system-prompt flag (see agent()). Without this note, models
+        # answer vague questions by reaching for the shell, which chat blocks,
+        # and the turn ends with no reply.
+        note = "[Switchboard chat: reply directly. Shell commands are disabled here, so don't run any.]"
+        msgs = list(messages)
+        for i in range(len(msgs) - 1, -1, -1):
+            if msgs[i].role == "user":
+                msgs[i] = Msg("user", f"{note}\n\n{msgs[i].content}")
+                break
+        return super().chat(msgs, model, session_id, effort)
 
     def agent(
         self,

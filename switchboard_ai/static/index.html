@@ -2499,6 +2499,68 @@
     </div>
   </div>
 
+  <!-- Antigravity CLI sign-in (agy's Google OAuth, driven by the server) -->
+  <div class="overlay" id="agy-login-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="agy-login-title" style="max-width:540px">
+      <h2 id="agy-login-title" style="display:flex;gap:10px;align-items:center">
+        <span class="pmark antigravity"><img src="/static/agy-logo.png" alt="Antigravity" draggable="false"></span>
+        <span>Sign in to Antigravity</span>
+      </h2>
+      <p class="sub" style="margin-bottom:14px">
+        Choose the Google account for agy in the tab that opened.
+        No tab? <a id="agy-login-link" href="#" target="_blank" rel="noopener noreferrer">Open the Google sign-in page</a>.
+      </p>
+      <div class="field">
+        <label for="inp-agy-login-code">If Google shows an authorization code, paste it here</label>
+        <input class="input mono" id="inp-agy-login-code" placeholder="Authorization code" autocomplete="off">
+      </div>
+      <p class="sub" id="agy-login-status" style="margin:0 0 14px;font-size:12px">Waiting for you to sign in…</p>
+      <div class="modal-actions">
+        <button class="btn" data-act="cancel-agy-login">Cancel</button>
+        <button class="btn primary" data-act="submit-agy-login-code">Submit code</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Antigravity CLI first-run setup (shown before agy can sign in or out) -->
+  <div class="overlay" id="agy-setup-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="agy-setup-title" style="max-width:560px">
+      <h2 id="agy-setup-title" style="display:flex;gap:10px;align-items:center">
+        <span class="pmark antigravity"><img src="/static/agy-logo.png" alt="Antigravity" draggable="false"></span>
+        <span>Finish Antigravity CLI setup</span>
+      </h2>
+      <p class="sub" style="margin-bottom:14px">
+        agy asks this once, before its first interactive use. It has to be done before agy can sign in or out.
+        Your answers here are entered into agy's setup for you.
+      </p>
+      <div
+        style="background:var(--bg-2);padding:14px;border-radius:10px;border:1px solid var(--border);margin-bottom:14px;font-size:13px;line-height:1.6">
+        <b>Terms of Service &amp; Data Use</b>
+        <p style="margin:6px 0 0">AI coding agents are known to have certain security risks, including autonomous code
+          execution, data exfiltration, prompt injection and supply chain risks. Ensure that you monitor and verify all
+          actions taken by the agent.</p>
+        <p style="margin:8px 0 0">
+          <a href="https://antigravity.google/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> ·
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+        </p>
+      </div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5;margin-bottom:10px">
+        <input type="checkbox" id="agy-setup-accept" style="margin-top:3px">
+        <span>I accept the Google Antigravity CLI Terms of Service and the Google Privacy Policy.</span>
+      </label>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5;margin-bottom:14px">
+        <input type="checkbox" id="agy-setup-share" style="margin-top:3px">
+        <span>Optional: Yes, I agree to help improve Antigravity CLI by allowing Google to collect and use my
+          Interactions data, subject to the Google Antigravity CLI Terms of Service and Google Privacy Policy. I
+          understand I can choose to opt out later whenever I want via my settings.</span>
+      </label>
+      <div class="modal-actions">
+        <button class="btn" data-act="close-agy-setup">Cancel</button>
+        <button class="btn primary" id="agy-setup-submit" data-act="submit-agy-setup">Finish setup and continue</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Antigravity Google Auth Modal -->
   <div class="overlay" id="antigravity-auth-modal">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="antigravity-auth-title" style="max-width:540px">
@@ -3373,6 +3435,112 @@ console.log(data.content);`];
     /* ================================================================
        status view
        ================================================================ */
+    /* agy's own sign-in (Sign in / Log out on the Antigravity card). The
+       account and tokens listed on the card come from the Antigravity IDE. */
+    function paintAgyCli(st) {
+      const pill = $("#agy-cli-pill"), acts = $("#agy-cli-actions"), note = $("#agy-cli-note");
+      if (!pill) return;
+      if (!st || !st.available) {
+        pill.className = "pill off";
+        pill.textContent = st ? "agy not installed" : "Status unknown";
+        acts.innerHTML = "";
+        note.innerHTML = st ? `Install the Antigravity CLI with <code class="mono">switchboard-ai setup</code>.` : "";
+        return;
+      }
+      const login = st.login || {};
+      const waiting = login.state === "waiting";
+      pill.className = "pill " + (st.signed_in ? "ok" : waiting ? "warn" : "off");
+      pill.textContent = waiting ? "Signing in…" : st.signed_in == null ? "Status unknown" : st.signed_in ? "Signed in" : "Not signed in";
+      acts.innerHTML = !st.supported ? ""
+        : st.signed_in ? `<button class="btn sm" data-agy="logout"><svg class="i sm"><use href="#i-x"/></svg>Log out</button>`
+        : `<button class="btn sm primary" data-agy="login"${waiting ? " disabled" : ""}><svg class="i sm"><use href="#i-play"/></svg>Sign in</button>`;
+      if (!st.supported) {
+        note.innerHTML = `Run <code class="mono">agy</code> in a terminal to sign in or out (<code class="mono">/logout</code>).`;
+      } else if (waiting) {
+        note.textContent = "Signing in: finish in the Google tab, or paste the code Google shows.";
+      } else if (login.state === "failed") {
+        note.textContent = "Sign-in failed: " + (login.error || "unknown error");
+      } else {
+        note.textContent = "Sign in / Log out set the Google account agy uses for chats. The account and tokens below are from the Antigravity IDE.";
+      }
+    }
+
+    async function loadAgyCli(refresh = false) {
+      try {
+        const st = await api("/auth/antigravity/cli" + (refresh ? "?refresh=true" : ""));
+        paintAgyCli(st);
+        return st;
+      } catch (e) {
+        paintAgyCli(null);
+        return null;
+      }
+    }
+
+    async function agyLogout() {
+      const pill = $("#agy-cli-pill");
+      if (pill) pill.textContent = "Logging out…";
+      $$("[data-agy]").forEach(b => b.disabled = true);
+      try {
+        const res = await api("/auth/antigravity/cli/logout", { method: "POST" });
+        if (res.ok) toast("agy logged out");
+        else if (res.needs_setup) openAgySetup("logout");
+        else toast(res.error, "err");
+      } catch (err) { toast(err.message, "err"); }
+      loadAgyCli();
+    }
+
+    function openAgySetup(next) {
+      S.agySetupNext = next;
+      $("#agy-setup-accept").checked = false;
+      $("#agy-setup-share").checked = false;
+      $("#agy-setup-modal").classList.add("show");
+    }
+
+    // `tab` is opened in the click handler itself, so popup blockers allow it.
+    async function agyLogin(tab) {
+      const pill = $("#agy-cli-pill");
+      if (pill) pill.textContent = "Opening sign-in…";
+      $$("[data-agy]").forEach(b => b.disabled = true);
+      try {
+        const res = await api("/auth/antigravity/cli/login", { method: "POST" });
+        if (!res.ok) {
+          tab?.close();
+          if (res.needs_setup) openAgySetup("login");
+          else toast(res.error, res.already ? "info" : "err");
+          loadAgyCli();
+          return;
+        }
+        const url = res.login?.url || "";
+        if (tab && url) tab.location.href = url; else tab?.close();
+        $("#agy-login-link").href = url || "#";
+        $("#inp-agy-login-code").value = "";
+        $("#agy-login-status").textContent = "Waiting for you to sign in…";
+        $("#agy-login-modal").classList.add("show");
+        loadAgyCli();
+        pollAgyLogin();
+      } catch (err) {
+        tab?.close();
+        toast(err.message, "err");
+        loadAgyCli();
+      }
+    }
+
+    let agyPoll = null;
+    function pollAgyLogin() {
+      clearInterval(agyPoll);
+      let n = 0;
+      agyPoll = setInterval(async () => {
+        if (++n > 600) { clearInterval(agyPoll); return; }  // 10 minutes
+        const st = await loadAgyCli();
+        const state = st?.login?.state;
+        if (state === "waiting" || state === "starting") return;
+        clearInterval(agyPoll);
+        $("#agy-login-modal").classList.remove("show");
+        if (state === "done") { toast("Antigravity signed in"); renderStatus(); }
+        else if (state === "failed" && st.login.error !== "Sign-in cancelled.") toast(st.login.error || "Sign-in failed", "err");
+      }, 1000);
+    }
+
     async function renderStatus() {
       try { await loadHealth(); } catch (e) { toast(e.message, "err"); return; }
       const h = S.health;
@@ -3414,14 +3582,16 @@ console.log(data.content);`];
         <div class="card" style="margin:0;background:var(--card-sub, var(--bg-hover))">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap">
             <h3 style="margin:0;display:flex;align-items:center;gap:8px">${pmark("antigravity")}Antigravity
-              <span class="pill ${a.logged_in ? "ok" : "off"}">${a.logged_in ? "Signed in" : "Not signed in"}</span>
+              <span id="agy-cli-pill" class="pill off">Checking…</span>
             </h3>
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <span id="agy-cli-actions" style="display:contents"></span>
               <button class="btn sm" data-manual-token="antigravity" title="Enter / Paste Antigravity Tokens Manually"><svg class="i sm"><use href="#i-key"/></svg>Manual</button>
               <button class="btn sm" data-refresh-auth="antigravity" title="Refresh Antigravity Token"><svg class="i sm"><use href="#i-refresh"/></svg></button>
-              <button class="btn sm primary" data-login="antigravity"><svg class="i sm"><use href="#i-play"/></svg>Authenticate Antigravity</button>
+              ${a.login_configured ? `<button class="btn sm primary" data-login="antigravity"><svg class="i sm"><use href="#i-play"/></svg>Authenticate Antigravity</button>` : ""}
             </div>
           </div>
+          <p id="agy-cli-note" class="sub" style="margin:0 0 10px;font-size:12px"></p>
           <dl class="kv">
             <dt>Account</dt><dd><b>${esc(a.name || "User")}</b> &lt;${esc(a.email || "unknown")}&gt;</dd>
             <dt>Plan tier</dt><dd><span class="pill ok">${esc(a.subscription || "Google AI Pro")}</span></dd>
@@ -3437,6 +3607,7 @@ console.log(data.content);`];
           </dl>
         </div>
       `;
+          loadAgyCli();
         } catch (e) {
           accEl.innerHTML = `<div class="empty-note">Failed to load account auth: ${esc(e.message)}</div>`;
         }
@@ -3449,7 +3620,7 @@ console.log(data.content);`];
         <span class="pill ${p.available ? "ok" : "off"}" style="margin-left:auto">${p.available ? "connected" : p.enabled ? "not found" : "disabled"}</span></h2>
       <dl class="kv">
         <dt>Binary</dt><dd>${esc(p.binary || "—")}</dd>
-        ${"logged_in" in p ? `<dt>Signed in</dt><dd>${p.logged_in ? "yes" : "no — click Authenticate above to sign in"}</dd>` : ""}
+        ${"logged_in" in p ? `<dt>Signed in</dt><dd>${p.logged_in ? "yes" : `no — click ${p.id === "antigravity" ? "Sign in" : "Authenticate"} above to sign in`}</dd>` : ""}
         <dt>Models</dt><dd>${n}${p.models_source ? ` (from ${esc(p.models_source)})` : ""}</dd>
         <dt>Effort levels</dt><dd>${esc(p.efforts.join(", "))}</dd>
       </dl></div>`;
@@ -3544,7 +3715,7 @@ console.log(data.content);`];
        events
        ================================================================ */
     document.addEventListener("click", e => {
-      const t = e.target.closest("[data-act],[data-view],[data-conv],[data-model],[data-suggest],[data-snip],[data-tool],[data-drop],[data-copy-from],[data-copy-val],[data-login],[data-manual-token],[data-refresh-auth]");
+      const t = e.target.closest("[data-act],[data-view],[data-conv],[data-model],[data-suggest],[data-snip],[data-tool],[data-drop],[data-copy-from],[data-copy-val],[data-login],[data-manual-token],[data-refresh-auth],[data-agy]");
       if (!t) {
         if (!e.target.closest("#model-pop")) toggleModelPop(false);
         return;
@@ -3565,6 +3736,16 @@ console.log(data.content);`];
       if (t.dataset.drop) { api("/sessions/" + encodeURIComponent(t.dataset.drop), { method: "DELETE" }).then(renderStatus).catch(err => toast(err.message, "err")); return; }
       if (t.dataset.copyFrom) return copyText($("#" + t.dataset.copyFrom).value, t);
       if (t.dataset.copyVal) return copyText(t.dataset.copyVal, t);
+
+      if (t.dataset.agy === "login") {
+        agyLogin(window.open("about:blank", "_blank"));
+        return;
+      }
+      if (t.dataset.agy === "logout") {
+        if (!confirm("Log agy out of its Google account? Gemini chats stop working until you sign in again.")) return;
+        agyLogout();
+        return;
+      }
 
       if (t.dataset.login) {
         const prov = t.dataset.login;
@@ -3598,7 +3779,7 @@ console.log(data.content);`];
             const info = res.antigravity || {};
             const authUrl = info.redirect_url;
             if (!authUrl) {
-              toast("Failed to generate Google OAuth URL", "err");
+              toast(info.error || "Failed to generate Google OAuth URL", "err");
               return;
             }
             window.open(authUrl, "_blank");
@@ -3723,6 +3904,45 @@ console.log(data.content);`];
             toast(`${provLabel(prov)} tokens saved successfully!`);
             $("#token-edit-modal").classList.remove("show");
             renderStatus();
+          }).catch(err => toast(err.message, "err"));
+          return;
+        }
+        case "close-agy-setup": return $("#agy-setup-modal").classList.remove("show");
+        case "submit-agy-setup": {
+          if (!$("#agy-setup-accept").checked) return toast("Accept the Terms of Service to continue", "err");
+          const btn = $("#agy-setup-submit");
+          btn.disabled = true;
+          btn.textContent = "Finishing setup…";
+          api("/auth/antigravity/cli/setup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accept_terms: true, share_data: $("#agy-setup-share").checked }),
+          }).then(res => {
+            if (!res.ok) { toast(res.error, "err"); return; }
+            $("#agy-setup-modal").classList.remove("show");
+            toast("agy setup finished", "info");
+            if (S.agySetupNext === "login") agyLogin(window.open("about:blank", "_blank"));
+            else agyLogout();
+          }).catch(err => toast(err.message, "err"))
+            .finally(() => { btn.disabled = false; btn.textContent = "Finish setup and continue"; });
+          return;
+        }
+        case "cancel-agy-login": {
+          clearInterval(agyPoll);
+          $("#agy-login-modal").classList.remove("show");
+          api("/auth/antigravity/cli/login/cancel", { method: "POST" }).finally(() => setTimeout(loadAgyCli, 1500));
+          return;
+        }
+        case "submit-agy-login-code": {
+          const code = $("#inp-agy-login-code").value.trim();
+          if (!code) return toast("Paste the authorization code first", "err");
+          api("/auth/antigravity/cli/login/code", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code }),
+          }).then(res => {
+            if (!res.ok) return toast(res.error, "err");
+            $("#agy-login-status").textContent = "Code sent. Finishing sign-in…";
           }).catch(err => toast(err.message, "err"));
           return;
         }

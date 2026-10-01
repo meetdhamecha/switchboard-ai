@@ -1,5 +1,6 @@
 @echo off
-REM Double-click to start Switchboard AI. Creates a venv on first run.
+REM Double-click to start Switchboard AI. First run: creates a venv and offers
+REM to install Claude Code and the Antigravity CLI if they are missing.
 setlocal
 cd /d "%~dp0"
 
@@ -7,6 +8,7 @@ if not exist ".venv\Scripts\python.exe" (
     echo Creating virtual environment...
     python -m venv .venv || goto :error
     ".venv\Scripts\python.exe" -m pip install -q -e ".[api]" || goto :error
+    ".venv\Scripts\python.exe" -m switchboard_ai setup
 )
 
 REM Open the UI once the server has had a moment to start.

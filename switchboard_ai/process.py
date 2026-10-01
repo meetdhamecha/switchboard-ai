@@ -458,6 +458,10 @@ class SessionPool:
         for s in victims:
             await s.close()
 
+    def reopen(self) -> None:
+        """Allow warm spares again after close_all (e.g. after an account switch)."""
+        self._closed = False
+
     def stats(self) -> dict:
         now = time.monotonic()
         return {
