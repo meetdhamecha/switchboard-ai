@@ -147,6 +147,10 @@ LEAN_CHAT: bool = _bool("LEAN_CHAT", "1")
 
 # Pre-spawn the spares at boot (otherwise after the first request).
 WARMUP_ON_STARTUP: bool = _bool("WARMUP_ON_STARTUP", "1")
+# Models to pre-spawn at boot, comma-separated ("antigravity:gemini-3.8-flash-low,
+# claude:claude-sonnet-5"). A provider not listed warms the default model, or
+# its first one. At most SPARE_MAX_TOTAL per provider stay warm.
+WARM_MODELS: list[str] = _csv("WARM_MODELS", "")
 
 # Seconds an idle chat session is kept before being reaped.
 SESSION_IDLE_TTL: int = int(os.getenv("SESSION_IDLE_TTL", str(15 * 60)))

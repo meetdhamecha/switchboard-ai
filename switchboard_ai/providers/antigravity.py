@@ -26,7 +26,7 @@ from typing import AsyncGenerator, Optional
 from switchboard_ai import config
 from switchboard_ai.discovery import find_agy_binaries, resolve
 from switchboard_ai.process import Msg, SessionPool, run_once
-from switchboard_ai.providers.base import UUID_RE, Provider, tool_detail
+from switchboard_ai.providers.base import EFFORT_LEVELS, UUID_RE, Provider, nearest_effort, tool_detail
 
 # Used until `agy models` answers (or if it cannot be reached).
 FALLBACK_MODELS: list[dict] = [
@@ -50,6 +50,10 @@ FALLBACK_MODELS: list[dict] = [
 def _tier(name: str) -> str:
     m = re.search(r"\(([^)]+)\)\s*$", name)
     return m.group(1) if m else ""
+
+
+# The thinking level is part of the model id ("gemini-3.8-flash-low").
+_LEVEL_ID = re.compile(r"^(.+)-(low|medium|high)$")
 
 
 # Google out of capacity / rate limiting for a model.
@@ -175,21 +179,51 @@ class AntigravityProvider(Provider):
     def new_parser(self):
         return _parser()
 
-    def _base(self, model: str, effort: str) -> list[str]:
-        cmd = [
+    def _base(self, model: str) -> list[str]:
+        # Never --effort: agy rejects it unless it repeats the level already in
+        # the id ("--model gemini-3.8-flash-high conflicts with --effort=low",
+        # "--effort is not supported for model claude-opus-4-6-thinking"), and
+        # the process exits after its ~10 s start. resolve_effort() picks the
+        # variant instead.
+        return [
             self.binary, "-p=",
             "--input-format", "stream-json",
             "--output-format", "stream-json",
             "--disable-slash-commands",
             "--model", model,
         ]
-        if effort:
-            cmd += ["--effort", effort]
-        return cmd
 
     def _chat_command(self, model: str, effort: str) -> list[str]:
         # No permission flags: anything that needs approval is auto-denied.
-        return self._base(model, effort or self.effort(config.DEFAULT_EFFORT))
+        return self._base(model)
+
+    def _levels(self, model: str) -> dict[str, str]:
+        """level → model id for the variants of `model` ("gemini-3.8-flash-high"
+        or the bare "gemini-3.8-flash"); empty when it has none."""
+        m = _LEVEL_ID.match(model)
+        base = m.group(1) if m else model
+        out = {}
+        for entry in self._models:
+            v = _LEVEL_ID.match(entry["id"])
+            if v and v.group(1) == base:
+                out[v.group(2)] = entry["id"]
+        return out
+
+    def model_efforts(self, model: str) -> tuple[str, ...]:
+        levels = self._levels(model)
+        return tuple(e for e in EFFORT_LEVELS if e in levels)
+
+    def resolve_effort(self, model: str, effort: Optional[str]) -> tuple[str, str]:
+        """A requested effort switches to that variant of the model (the
+        nearest one that exists). The effort returned is the variant's level;
+        it is only a label here, never a command-line flag. SWITCHBOARD_EFFORT
+        is not applied: an id like "-high" already says what to run."""
+        levels = self._levels(model)
+        want = (effort or "").strip().lower()
+        if levels and want in EFFORT_LEVELS:
+            model = levels[nearest_effort(want, tuple(levels))]
+        m = _LEVEL_ID.match(model)
+        return model, (m.group(2) if m and levels else "")
 
     # ── Provider API ────────────────────────────────────────
 
@@ -214,9 +248,9 @@ class AntigravityProvider(Provider):
             self._models = models
             self.models_source = "agy models"
 
-    async def startup(self, warm_model: Optional[str]) -> None:
+    async def startup(self, warm_models: list[str]) -> None:
         await self.refresh_models()
-        await super().startup(warm_model)
+        await super().startup(warm_models)
 
     async def reset_sessions(self) -> None:
         """Drop every agy process after a sign-in or sign-out and reload the
@@ -249,7 +283,10 @@ class AntigravityProvider(Provider):
 
 
     def models(self) -> list[dict]:
-        return [{**m, "tier": _tier(m["name"]), "provider": self.id} for m in self._models]
+        return [{**m, "tier": _tier(m["name"]), "provider": self.id,
+                 "efforts": list(self.model_efforts(m["id"])),
+                 "effort": self.resolve_effort(m["id"], None)[1] or None}
+                for m in self._models]
 
     def agent_tools(self) -> list[str]:
         # agy has no per-tool allow flag: it is either "edits" (read + write
@@ -283,7 +320,8 @@ class AntigravityProvider(Provider):
         resume: Optional[str],
         effort: Optional[str],
     ) -> AsyncGenerator[dict, None]:
-        cmd = self._base(model, self.effort(effort) or self.effort(config.DEFAULT_EFFORT))
+        model, _ = self.resolve_effort(model, effort)
+        cmd = self._base(model)
         # Without --add-dir agy works in its own scratch folder, not the cwd.
         cmd += ["--add-dir", working_dir]
         cmd += ["--dangerously-skip-permissions"] if config.AGENT_ALLOW_SHELL else ["--mode", "accept-edits"]

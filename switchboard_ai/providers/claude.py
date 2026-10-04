@@ -210,7 +210,7 @@ class ClaudeProvider(Provider):
         return cmd
 
     def _chat_command(self, model: str, effort: str) -> list[str]:
-        cmd = self._base(model, effort or config.DEFAULT_EFFORT)
+        cmd = self._base(model, effort)
         # --allowedTools / --tools are variadic; safe here because no
         # positional prompt follows (the prompt goes over stdin).
         if config.CHAT_ALLOWED_TOOLS:
@@ -254,7 +254,7 @@ class ClaudeProvider(Provider):
 
 
     def models(self) -> list[dict]:
-        return [{**m, "provider": self.id} for m in MODELS]
+        return [{**m, "provider": self.id, "efforts": list(self.model_efforts(m["id"]))} for m in MODELS]
 
     def agent_tools(self) -> list[str]:
         tools = list(config.AGENT_ALLOWED_TOOLS)
@@ -274,7 +274,7 @@ class ClaudeProvider(Provider):
         allowed = self.agent_tools()
         # A request can narrow the configured tool list, never widen it.
         chosen = [t for t in (tools or allowed) if t in allowed]
-        cmd = self._base(model, self.effort(effort) or config.DEFAULT_EFFORT)
+        cmd = self._base(*self.resolve_effort(model, effort))
         if chosen:
             cmd += ["--allowedTools", ",".join(chosen)]
         if resume and UUID_RE.match(resume):

@@ -140,9 +140,12 @@ class ClaudeAPIProvider(Provider):
         }
 
     def models(self) -> list[dict]:
-        return [{**m, "provider": self.id} for m in MODELS]
+        return [{**m, "provider": self.id, "efforts": list(self.model_efforts(m["id"]))} for m in MODELS]
 
-    async def startup(self, warm_model: Optional[str]) -> None:
+    def model_efforts(self, model: str) -> tuple[str, ...]:
+        return () if CLI_TO_API.get(model, model) in _NO_EFFORT else self.efforts
+
+    async def startup(self, warm_models: list[str]) -> None:
         return None
 
     async def shutdown(self) -> None:
@@ -183,9 +186,8 @@ class ClaudeAPIProvider(Provider):
         }
         if model not in _NO_EFFORT:
             params["thinking"] = {"type": "adaptive"}
-            e = self.effort(effort) or self.effort(config.DEFAULT_EFFORT)
-            if e:
-                params["output_config"] = {"effort": e}
+            if effort:
+                params["output_config"] = {"effort": effort}
         if web:
             dynamic = model in _DYNAMIC_WEB
             params["tools"] = [
@@ -207,7 +209,7 @@ class ClaudeAPIProvider(Provider):
     ) -> AsyncGenerator[dict, None]:
         import anthropic
 
-        model = CLI_TO_API.get(model, model)
+        model, effort = self.resolve_effort(CLI_TO_API.get(model, model), effort)
         turns, system = self._conversation(messages, session_id)
         if not turns:
             yield {"type": "error", "content": "no user message to answer"}

@@ -1,0 +1,23 @@
+services:
+  switchboard:
+    build: .
+    image: switchboard-ai
+    container_name: switchboard
+    ports:
+      - "127.0.0.1:8000:8000"   # this PC only
+    environment:
+      API_KEY: ${API_KEY:-}     # optional; taken from .env next to this file
+      TRUSTED_HOSTS: localhost,127.0.0.1
+      # Start these warm at boot, so the first request skips agy's ~10 s start.
+      WARM_MODELS: ${WARM_MODELS:-antigravity:gemini-3.8-flash-low,claude:claude-sonnet-5}
+      # Two ready Gemini processes: back-to-back requests without a
+      # session_id don't wait for the one that is still starting.
+      AGY_SPARE_PROCESSES: ${AGY_SPARE_PROCESSES:-2}
+    volumes:
+      - claude-login:/home/app/.claude
+      - agy-data:/home/app/.gemini
+    restart: unless-stopped
+
+volumes:
+  claude-login:
+  agy-data:

@@ -37,13 +37,13 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from switchboard_ai import __version__, config
 from switchboard_ai.pacing import smooth_text_stream
 from switchboard_ai.process import Msg
 from switchboard_ai.providers import RoutingError, registry
-from switchboard_ai.providers.base import Provider
+from switchboard_ai.providers.base import EFFORT_LEVELS, Provider
 from switchboard_ai.orchestrator import orchestrator
 from switchboard_ai.router import MODES, is_auto, mode_of, router
 
@@ -79,11 +79,18 @@ def _banner() -> None:
 async def lifespan(app: FastAPI):
     _banner()
     dp, dm = registry.default()
+    listed: dict[str, list[str]] = {}
+    for key in config.WARM_MODELS if config.WARMUP_ON_STARTUP else []:
+        try:
+            p, m = registry.resolve(key, None)
+            listed.setdefault(p.id, []).append(m)
+        except RoutingError as e:
+            print(f"  WARM_MODELS: skipping {key!r}: {e.detail}")
 
     async def start(p: Provider) -> None:
-        warm = None
+        warm: list[str] = []
         if config.WARMUP_ON_STARTUP:
-            warm = dm if p is dp else (p.models()[0]["id"] if p.models() else None)
+            warm = listed.get(p.id) or ([dm] if p is dp else [m["id"] for m in p.models()[:1]])
         try:
             await p.startup(warm)
         except Exception as e:
@@ -586,6 +593,20 @@ class Message(BaseModel):
     content: str
 
 
+_EFFORT_HELP = (
+    "Thinking effort: low | medium | high | xhigh | max. Claude uses it as given; "
+    "Gemini and GPT-OSS switch to the matching -low / -medium / -high model. A level "
+    "the model lacks uses the nearest one. GET /models lists each model's levels."
+)
+
+
+def _check_effort(v: Optional[str]) -> Optional[str]:
+    v = (v or "").strip().lower() or None
+    if v and v not in EFFORT_LEVELS:
+        raise ValueError(f"effort must be one of: {', '.join(EFFORT_LEVELS)}")
+    return v
+
+
 class ChatRequest(BaseModel):
     messages: list[Message] = Field(..., min_length=1)
     model: Optional[str] = Field(
@@ -595,7 +616,9 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = Field(
         None, description="Keep a warm conversation. After the first turn you may send only the new message."
     )
-    effort: Optional[str] = Field(None, description="low | medium | high (claude also: xhigh, max)")
+    effort: Optional[str] = Field(None, description=_EFFORT_HELP)
+
+    validate_effort = field_validator("effort")(_check_effort)
 
     model_config = {
         "json_schema_extra": {
@@ -603,6 +626,7 @@ class ChatRequest(BaseModel):
                 "model": "claude-sonnet-5",
                 "messages": [{"role": "user", "content": "Hello!"}],
                 "session_id": "my-chat-1",
+                "effort": "medium",
             }
         }
     }
@@ -615,7 +639,9 @@ class AgentRequest(BaseModel):
     working_dir: Optional[str] = Field(None, description="Directory the agent may read and edit")
     tools: Optional[list[str]] = Field(None, description="Claude only: subset of the configured agent tools")
     resume: Optional[str] = Field(None, description="native_session_id from a previous task, to continue it")
-    effort: Optional[str] = None
+    effort: Optional[str] = Field(None, description=_EFFORT_HELP)
+
+    validate_effort = field_validator("effort")(_check_effort)
 
     model_config = {
         "json_schema_extra": {
@@ -704,20 +730,23 @@ async def _chat_plan(
     messages: list[Msg],
     session_id: Optional[str],
     effort: Optional[str],
-) -> tuple[str, str, AsyncGenerator[dict, None]]:
-    """(provider id, model, event stream) for a named model or an auto-* model."""
+) -> tuple[str, str, Optional[str], AsyncGenerator[dict, None]]:
+    """(provider id, model, effort, event stream) for a named model or an
+    auto-* model. Model and effort are what will actually run (a Gemini
+    effort picks that variant of the model)."""
     mode = mode_of(model)
     if mode:
         name = next(k for k, v in MODES.items() if v == mode)
-        return "auto", name, orchestrator.stream(mode, messages, session_id, effort)
+        return "auto", name, effort, orchestrator.stream(mode, messages, session_id, effort)
     p, m = registry.resolve(model, provider)
-    return p.id, m, p.chat(messages, m, session_id, effort)
+    m, e = p.resolve_effort(m, effort)
+    return p.id, m, e or None, p.chat(messages, m, session_id, e)
 
 
-def _routed(out: dict, pid: str, model: str) -> tuple[str, str]:
-    """The provider and model that actually answered."""
+def _routed(out: dict, pid: str, model: str, effort: Optional[str]) -> tuple[str, str, Optional[str]]:
+    """The provider, model and effort that actually answered."""
     r = out.get("route")
-    return (r["provider"], r["model"]) if r else (pid, model)
+    return (r["provider"], r["model"], r.get("effort")) if r else (pid, model, effort)
 
 
 def _working_dir(requested: Optional[str]) -> str:
@@ -806,15 +835,17 @@ async def explain_route(req: RouteRequest):
 @app.post("/chat", tags=["Chat"], dependencies=[Depends(require_key)])
 async def chat(req: ChatRequest):
     t0 = time.monotonic()
-    pid, model, events = await _chat_plan(req.model, req.provider, _msgs(req.messages), req.session_id, req.effort)
+    pid, model, effort, events = await _chat_plan(
+        req.model, req.provider, _msgs(req.messages), req.session_id, req.effort)
     out = await _collect(events)
     _raise_failure(out)
     final = out["final"]
-    pid, model = _routed(out, pid, model)
+    pid, model, effort = _routed(out, pid, model, effort)
     return {
         "id": f"msg_{uuid.uuid4().hex[:16]}",
         "provider": pid,
         "model": model,
+        "effort": effort,
         "routing": out["route"],
         "content": out["content"],
         "session_id": req.session_id,
@@ -831,10 +862,12 @@ async def chat(req: ChatRequest):
 
 @app.post("/chat/stream", tags=["Chat"], dependencies=[Depends(require_key)])
 async def chat_stream(req: ChatRequest):
-    pid, model, events = await _chat_plan(req.model, req.provider, _msgs(req.messages), req.session_id, req.effort)
+    pid, model, effort, events = await _chat_plan(
+        req.model, req.provider, _msgs(req.messages), req.session_id, req.effort)
 
     async def gen():
-        yield _sse({"type": "session", "session_id": req.session_id, "provider": pid, "model": model})
+        yield _sse({"type": "session", "session_id": req.session_id, "provider": pid, "model": model,
+                    "effort": effort})
         async for ev in _paced(events):
             yield _sse(ev)
         yield _sse({"type": "done"})
@@ -854,9 +887,11 @@ async def _agent_setup(req: AgentRequest) -> tuple[Provider, str, str, Optional[
         if not route.candidates:
             raise HTTPException(503, registry._none_available())
         p, model, effort = route.candidates[0]
-        return p, model, wd, req.effort or effort, route.describe(0)
+        model, effort = p.resolve_effort(model, req.effort or effort)
+        return p, model, wd, effort or None, route.describe(0)
     p, model = registry.resolve(req.model, req.provider)
-    return p, model, wd, req.effort, None
+    model, effort = p.resolve_effort(model, req.effort)
+    return p, model, wd, effort or None, None
 
 
 @app.post("/agent/task", tags=["Agent"], dependencies=[Depends(require_key)])
@@ -870,6 +905,7 @@ async def agent_task(req: AgentRequest):
         "id": f"task_{uuid.uuid4().hex[:16]}",
         "provider": p.id,
         "model": model,
+        "effort": effort,
         "routing": route,
         "content": out["content"],
         "working_dir": wd,
@@ -889,7 +925,7 @@ async def agent_task_stream(req: AgentRequest):
 
     async def gen():
         yield _sse({
-            "type": "session", "provider": p.id, "model": model,
+            "type": "session", "provider": p.id, "model": model, "effort": effort,
             "working_dir": wd, "tools": p.agent_tools(),
         })
         if route:
@@ -940,9 +976,18 @@ class OAIRequest(BaseModel):
     messages: list[OAIMessage] = Field(..., min_length=1)
     stream: bool = False
     session_id: Optional[str] = None
-    reasoning_effort: Optional[str] = None
+    reasoning_effort: Optional[str] = Field(None, description=_EFFORT_HELP)
+    effort: Optional[str] = Field(None, description="Same as reasoning_effort")
 
     model_config = {"extra": "allow"}
+
+    @field_validator("reasoning_effort", "effort")
+    @classmethod
+    def validate_effort(cls, v: Optional[str]) -> Optional[str]:
+        # OpenAI clients may send these; the lowest level here is "low".
+        if (v or "").strip().lower() in ("minimal", "none"):
+            return "low"
+        return _check_effort(v)
 
 
 def _oai_text(content) -> str:
@@ -976,13 +1021,14 @@ async def oai_chat(req: OAIRequest, x_session_id: Optional[str] = Header(None)):
     sid = req.session_id or x_session_id
     cid = f"chatcmpl-{uuid.uuid4().hex[:24]}"
     created = int(time.time())
-    pid, model, events = await _chat_plan(req.model, None, msgs, sid, req.reasoning_effort)
+    pid, model, effort, events = await _chat_plan(req.model, None, msgs, sid, req.reasoning_effort or req.effort)
     name = "auto" if pid == "auto" else f"{pid}:{model}"
 
     if not req.stream:
         out = await _collect(events)
         _raise_failure(out)
-        name = "{}:{}".format(*_routed(out, pid, model))
+        rpid, rmodel, _ = _routed(out, pid, model, effort)
+        name = f"{rpid}:{rmodel}"
         u = out["final"].get("usage", {})
         pt, ct = u.get("input_tokens") or 0, u.get("output_tokens") or 0
         return {

@@ -499,7 +499,14 @@ class SessionPool:
             async with self._spare_lock:
                 old = [s for s in self._spares if now - s.created > _SPARE_MAX_AGE or not s.is_alive]
                 self._spares = [s for s in self._spares if s not in old]
-            for s in victims + old:
+            for s in victims:
+                await s.close()
+            for s in old:
+                # Replace an aged spare before closing it, so a model that was
+                # warm stays warm. Dropping it made the next request pay the
+                # full cold start (agy: ~10 s). Dead ones are not respawned.
+                if s.is_alive:
+                    await self._refill(s.model, s.effort)
                 await s.close()
 
     def start_reaper(self) -> None:

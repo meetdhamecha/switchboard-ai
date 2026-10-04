@@ -156,7 +156,7 @@ def _available(plan: list[tuple[str, str]]) -> list[tuple[Provider, str, str]]:
             continue
         if (p.id, model) not in seen:
             seen.add((p.id, model))
-            out.append((p, model, p.effort(effort)))
+            out.append((p, *p.resolve_effort(model, effort)))
     # Last resort: the server default, then anything that is up.
     dp, dm = registry.default()
     if dp and (dp.id, dm) not in seen:

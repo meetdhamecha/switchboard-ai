@@ -438,7 +438,12 @@ curl http://localhost:8000/chat -H "Content-Type: application/json" -d '{
 
 - **`model`**: a key from `/models` (`provider:id`), a bare id (`claude-opus-5-5`), or `auto`. Some ids exist in both providers (`claude-sonnet-4-6`), so use the `provider:` prefix for those. Leave `model` out to use `DEFAULT_MODEL`.
 - **`session_id`** keeps the conversation's process alive, so follow-ups start faster and only the new message is sent. If that process restarts, the history you send is replayed automatically.
-- **`effort`**: `low | medium | high` (Claude also takes `xhigh | max`).
+- **`effort`**: how hard the model thinks: `low | medium | high | xhigh | max`. Any other value is rejected (422). `/v1/chat/completions` takes it as `reasoning_effort` or `effort`.
+  - **Claude** runs the level as given (Claude API: Haiku 4.5 has no effort setting).
+  - **Gemini and GPT-OSS** have the level in the model id, so `effort` switches to that variant: `gemini-3.8-flash-high` + `"effort": "low"` runs `gemini-3.8-flash-low`. You can also send the bare name, `gemini-3.8-flash`.
+  - A level a model doesn't have uses the nearest one (`gemini-3.1-pro` has only low and high, so `medium` runs high). Claude Opus 4.6 Thinking on Antigravity has no levels.
+  - `GET /models` lists each model's levels under `efforts`. Every response says which `model` and `effort` actually ran.
+  - Lower effort answers faster: on Gemini 3.8 Flash, a short explanation took ~2.3 s on low vs ~6.4 s on high.
 
 **Streaming** (`/chat/stream`, `/agent/task/stream`): each line is `data: {json}` with a `type` of `session`, `text`, `tool_use`, `tool_result`, `notice`, `result`, `error`, or `done`.
 
@@ -604,7 +609,7 @@ Starting a CLI is slow, about **2 s for `claude`** and about **12 s for `agy`**,
 | Feature | What happens | Setting |
 |---|---|---|
 | **One process per conversation** | Send the same `session_id` again and the same process answers. It already holds the conversation, so only the new message is sent. | `session_id` in the request |
-| **Spare processes** | After each request, one extra process is pre-started for the model you just used, so the next new conversation starts warm. Spares are refreshed every 30 minutes. | `CLAUDE_SPARE_PROCESSES`, `AGY_SPARE_PROCESSES` |
+| **Spare processes** | After each request, one extra process is pre-started for the model you just used, so the next new conversation starts warm. Every 30 minutes each spare is replaced with a fresh one, so a model stays warm while the server is idle. | `CLAUDE_SPARE_PROCESSES`, `AGY_SPARE_PROCESSES` |
 | **Idle clean-up** | A conversation that's quiet for 15 minutes is closed. Checked every minute. | `SESSION_IDLE_TTL=900` |
 | **Limits and queue** | At most 6 `claude` and 4 `agy` requests run at once, and at most 12 warm conversations per provider. Extra requests wait in a queue instead of overloading your computer. | `*_MAX_CONCURRENT`, `MAX_SESSIONS` |
 | **Crash recovery** | If a process dies, or you press **Stop**, it's thrown away. The next message starts a new one and replays the conversation, so nothing is forgotten. | automatic |
@@ -775,6 +780,8 @@ Copy `.env.example` to `.env`. Every setting is optional and documented in that 
 | `TRUSTED_HOSTS` | empty (localhost only) | Host names the server answers to |
 | `DEFAULT_MODEL` | `claude-sonnet-5` | Model used when a request names none |
 | `CLAUDE_SPARE_PROCESSES` / `AGY_SPARE_PROCESSES` | `1` | Pre-started processes for faster first replies |
+| `WARM_MODELS` | empty | Models to start warm at boot, e.g. `antigravity:gemini-3.8-flash-low,claude:claude-sonnet-5`. Empty = the default model and each other provider's first model |
+| `SWITCHBOARD_EFFORT` | empty | Claude's effort when a request names none |
 | `SESSION_IDLE_TTL` / `TURN_TIMEOUT` | `900` / `300` s | Idle conversation lifetime / max time per turn |
 | `CHAT_ALLOWED_TOOLS` | `WebSearch,WebFetch` | Claude tools allowed in chat |
 | `AGENT_ALLOWED_TOOLS` | `Read,Glob,Grep,Write,Edit,WebSearch,WebFetch` | Claude tools allowed in agent tasks |
