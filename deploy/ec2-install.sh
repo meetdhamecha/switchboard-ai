@@ -41,15 +41,6 @@ as_user() {
     if [ "$(id -un)" = "$APP_USER" ]; then "$@"; else sudo -u "$APP_USER" -H "$@"; fi
 }
 
-# EC2 instance metadata (IMDSv2); prints nothing when not on EC2.
-imds() {
-    local token
-    token=$(curl -sf -m 2 -X PUT http://169.254.169.254/latest/api/token \
-        -H "X-aws-ec2-metadata-token-ttl-seconds: 60") || return 0
-    curl -sf -m 2 -H "X-aws-ec2-metadata-token: $token" \
-        "http://169.254.169.254/latest/meta-data/$1" || true
-}
-
 env_get() { sed -n "s/^$1=//p" "$ENV_FILE" | head -1 | tr -d '\r'; }
 
 env_set() {
@@ -59,14 +50,6 @@ env_set() {
         [ -z "$(tail -c1 "$ENV_FILE")" ] || echo >> "$ENV_FILE"
         echo "$1=$2" >> "$ENV_FILE"
     fi
-}
-
-add_trusted_host() {
-    [ -n "$1" ] || return 0
-    local cur
-    cur=$(env_get TRUSTED_HOSTS)
-    case ",$cur," in *",$1,"*) return 0 ;; esac
-    env_set TRUSTED_HOSTS "${cur:+$cur,}$1"
 }
 
 # ── 1. System packages ───────────────────────────────────────
@@ -121,15 +104,10 @@ if [ ! -f "$ENV_FILE" ]; then
     env_set API_PORT "${SWITCHBOARD_PORT:-8000}"
     env_set API_KEY "$(openssl rand -hex 32)"
 fi
-# The public address changes on every stop/start unless you attach an Elastic
-# IP, so add the current one each run.
-PUBLIC_IP=$(imds public-ipv4)
-[ -n "$PUBLIC_IP" ] || PUBLIC_IP=$(curl -sf -m 3 https://checkip.amazonaws.com | tr -d '[:space:]' || true)
-for h in localhost 127.0.0.1 "$PUBLIC_IP" "$(imds public-hostname)"; do
-    add_trusted_host "$h"
-done
 [ "$(id -u)" -ne 0 ] || chown "$APP_USER:" "$ENV_FILE"
 chmod 600 "$ENV_FILE"
+# The service also runs this before every start (see ExecStartPre below).
+PUBLIC_IP=$(as_user bash "$APP_DIR/deploy/ec2-refresh-hosts.sh" "$ENV_FILE")
 PORT=$(env_get API_PORT)
 PORT="${PORT:-8000}"
 
@@ -146,6 +124,8 @@ User=$APP_USER
 WorkingDirectory=$APP_DIR
 Environment=HOME=$APP_HOME
 Environment=PATH=$APP_HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# New public IP after a stop/start: allow it before the server starts.
+ExecStartPre=-/bin/bash $APP_DIR/deploy/ec2-refresh-hosts.sh $ENV_FILE
 ExecStart=$APP_DIR/.venv/bin/python -m switchboard_ai server
 Restart=always
 RestartSec=3
