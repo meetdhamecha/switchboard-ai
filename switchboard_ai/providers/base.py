@@ -46,6 +46,36 @@ _DETAIL_KEYS = (
 )
 
 
+# A request's tool choice rides along with the effort in the pool key, so a
+# tool-free request gets its own process (spares are kept per key) and the
+# default chat processes are untouched. "high|tools=" means effort high, no tools.
+_TOOLS_SEP = "|tools="
+
+
+def with_tools(effort: str, tools: Optional[list[str]]) -> str:
+    """Pool key part for (effort, requested tools). None = server default."""
+    if tools is None:
+        return effort
+    return f"{effort}{_TOOLS_SEP}{','.join(sorted(set(tools)))}"
+
+
+def split_tools(effort: str) -> tuple[str, Optional[list[str]]]:
+    """Inverse of with_tools: (real effort, requested tools or None)."""
+    if _TOOLS_SEP not in (effort or ""):
+        return effort, None
+    real, _, names = effort.partition(_TOOLS_SEP)
+    return real, [n for n in names.split(",") if n]
+
+
+def allowed_chat_tools(requested: Optional[list[str]]) -> str:
+    """Comma list of chat tools to enable: the server default, or the requested
+    subset of it (a request can remove tools, never add)."""
+    default = [t.strip() for t in config.CHAT_ALLOWED_TOOLS.split(",") if t.strip()]
+    if requested is None:
+        return ",".join(default)
+    return ",".join(t for t in default if t in set(requested))
+
+
 def chat_system_prompt(model_name: str, model_id: str, web: bool) -> str:
     """
     Short system prompt for chat turns. Replaces Claude Code's ~23k-token
@@ -144,9 +174,10 @@ class Provider:
         model: str,
         session_id: Optional[str],
         effort: Optional[str],
+        tools: Optional[list[str]] = None,
     ) -> AsyncGenerator[dict, None]:
         model, effort = self.resolve_effort(model, effort)
-        return self.pool.ask(session_id, messages, model, effort)
+        return self.pool.ask(session_id, messages, model, with_tools(effort, tools))
 
     def agent(
         self,

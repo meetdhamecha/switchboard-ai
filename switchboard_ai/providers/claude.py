@@ -23,7 +23,7 @@ from typing import AsyncGenerator, Optional
 from switchboard_ai import config
 from switchboard_ai.discovery import find_claude_binaries, resolve
 from switchboard_ai.process import Msg, SessionPool, run_once
-from switchboard_ai.providers.base import UUID_RE, Provider, chat_system_prompt, tool_detail
+from switchboard_ai.providers.base import UUID_RE, Provider, chat_system_prompt, tool_detail, allowed_chat_tools, split_tools
 
 MODELS: list[dict] = [
     {"id": "claude-opus-5-5",            "name": "Claude Opus 5.5",   "tier": "Flagship"},
@@ -210,21 +210,25 @@ class ClaudeProvider(Provider):
         return cmd
 
     def _chat_command(self, model: str, effort: str) -> list[str]:
+        effort, requested = split_tools(effort)
+        tools = allowed_chat_tools(requested)
         cmd = self._base(model, effort)
         # --allowedTools / --tools are variadic; safe here because no
         # positional prompt follows (the prompt goes over stdin).
-        if config.CHAT_ALLOWED_TOOLS:
-            cmd += ["--allowedTools", config.CHAT_ALLOWED_TOOLS]
+        if tools:
+            cmd += ["--allowedTools", tools]
+        if requested is not None and not tools and not config.LEAN_CHAT:
+            cmd += ["--tools", ""]  # this request asked for no tools at all
         if config.LEAN_CHAT:
             # Chat needs none of the coding-agent machinery: a short system
             # prompt, only the chat tools, no MCP servers, no user/project
             # settings (hooks, plugins) and no session files on disk.
             # Measured: ~25.7k → ~2.3k input tokens per turn.
             name = next((m["name"] for m in MODELS if m["id"] == model), model)
-            web = any(t in config.CHAT_ALLOWED_TOOLS for t in ("WebSearch", "WebFetch"))
+            web = any(t in tools.split(",") for t in ("WebSearch", "WebFetch"))
             cmd += [
                 "--system-prompt", chat_system_prompt(name, model, web),
-                "--tools", config.CHAT_ALLOWED_TOOLS,
+                "--tools", tools,
                 "--strict-mcp-config",
                 "--setting-sources", "",
                 "--no-session-persistence",

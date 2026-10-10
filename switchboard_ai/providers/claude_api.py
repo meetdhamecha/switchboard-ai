@@ -173,9 +173,12 @@ class ClaudeAPIProvider(Provider):
                                  or next(iter(self._history.values()))[1] < cutoff):
             self._history.popitem(last=False)
 
-    def _params(self, model: str, turns: list[dict], system: str, effort: Optional[str]) -> dict:
+    def _params(self, model: str, turns: list[dict], system: str, effort: Optional[str],
+                tools: Optional[list[str]] = None) -> dict:
         name = next((m["name"] for m in MODELS if m["id"] == model), model)
-        web = config.CLAUDE_API_WEB_TOOLS
+        # A request can switch the server tools off (tools=[]), never add them.
+        web = config.CLAUDE_API_WEB_TOOLS and (
+            tools is None or bool({"WebSearch", "WebFetch", "web_search", "web_fetch"} & set(tools)))
         system_text = chat_system_prompt(name, model, web) + (f"\n\n{system}" if system else "")
         params: dict = {
             "model": model,
@@ -206,6 +209,7 @@ class ClaudeAPIProvider(Provider):
         model: str,
         session_id: Optional[str],
         effort: Optional[str],
+        tools: Optional[list[str]] = None,
     ) -> AsyncGenerator[dict, None]:
         import anthropic
 
@@ -214,7 +218,7 @@ class ClaudeAPIProvider(Provider):
         if not turns:
             yield {"type": "error", "content": "no user message to answer"}
             return
-        params = self._params(model, turns, system, effort)
+        params = self._params(model, turns, system, effort, tools)
         use_fallbacks = model in _FALLBACKS
         usage = {"input_tokens": 0, "output_tokens": 0,
                  "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}

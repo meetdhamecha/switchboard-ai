@@ -617,6 +617,12 @@ class ChatRequest(BaseModel):
         None, description="Keep a warm conversation. After the first turn you may send only the new message."
     )
     effort: Optional[str] = Field(None, description=_EFFORT_HELP)
+    tools: Optional[list[str]] = Field(
+        None,
+        description="Chat tools for this request. Omit for the server default (CHAT_ALLOWED_TOOLS); "
+                    "[] switches every tool off (no web search or fetch); a list keeps only those "
+                    "of the allowed tools. Named models only (not auto-*).",
+    )
 
     validate_effort = field_validator("effort")(_check_effort)
 
@@ -730,17 +736,22 @@ async def _chat_plan(
     messages: list[Msg],
     session_id: Optional[str],
     effort: Optional[str],
+    tools: Optional[list[str]] = None,
 ) -> tuple[str, str, Optional[str], AsyncGenerator[dict, None]]:
     """(provider id, model, effort, event stream) for a named model or an
     auto-* model. Model and effort are what will actually run (a Gemini
     effort picks that variant of the model)."""
     mode = mode_of(model)
     if mode:
+        if tools is not None:
+            raise HTTPException(400, "tools can only be set with a named model, not auto-*")
         name = next(k for k, v in MODES.items() if v == mode)
         return "auto", name, effort, orchestrator.stream(mode, messages, session_id, effort)
     p, m = registry.resolve(model, provider)
     m, e = p.resolve_effort(m, effort)
-    return p.id, m, e or None, p.chat(messages, m, session_id, e)
+    if tools is None:
+        return p.id, m, e or None, p.chat(messages, m, session_id, e)
+    return p.id, m, e or None, p.chat(messages, m, session_id, e, tools)
 
 
 def _routed(out: dict, pid: str, model: str, effort: Optional[str]) -> tuple[str, str, Optional[str]]:
@@ -836,7 +847,7 @@ async def explain_route(req: RouteRequest):
 async def chat(req: ChatRequest):
     t0 = time.monotonic()
     pid, model, effort, events = await _chat_plan(
-        req.model, req.provider, _msgs(req.messages), req.session_id, req.effort)
+        req.model, req.provider, _msgs(req.messages), req.session_id, req.effort, req.tools)
     out = await _collect(events)
     _raise_failure(out)
     final = out["final"]
@@ -863,7 +874,7 @@ async def chat(req: ChatRequest):
 @app.post("/chat/stream", tags=["Chat"], dependencies=[Depends(require_key)])
 async def chat_stream(req: ChatRequest):
     pid, model, effort, events = await _chat_plan(
-        req.model, req.provider, _msgs(req.messages), req.session_id, req.effort)
+        req.model, req.provider, _msgs(req.messages), req.session_id, req.effort, req.tools)
 
     async def gen():
         yield _sse({"type": "session", "session_id": req.session_id, "provider": pid, "model": model,

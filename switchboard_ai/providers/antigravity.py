@@ -299,17 +299,25 @@ class AntigravityProvider(Provider):
         model: str,
         session_id: Optional[str],
         effort: Optional[str],
+        tools: Optional[list[str]] = None,
     ) -> AsyncGenerator[dict, None]:
         # agy has no system-prompt flag (see agent()). Without this note, models
         # answer vague questions by reaching for the shell, which chat blocks,
         # and the turn ends with no reply.
         note = "[Switchboard chat: reply directly. Shell commands are disabled here, so don't run any.]"
+        if tools is not None and not tools:
+            # agy has no per-tool switch, so "no tools" can only be asked for.
+            note = ("[Switchboard chat: reply directly from the text given. Do not use any tools: "
+                    "no web search, no web fetch, no files, no shell.]")
         msgs = list(messages)
         for i in range(len(msgs) - 1, -1, -1):
             if msgs[i].role == "user":
                 msgs[i] = Msg("user", f"{note}\n\n{msgs[i].content}")
                 break
-        return super().chat(msgs, model, session_id, effort)
+        events = super().chat(msgs, model, session_id, effort, tools)
+        if tools is None or tools:
+            return events
+        return _with_notice(events, "Antigravity cannot switch tools off; the model was told not to use any.")
 
     def agent(
         self,
@@ -335,3 +343,9 @@ class AntigravityProvider(Provider):
         messages = [Msg("user", f"{note}]\n\n{task}")]
         return run_once(self, cmd, working_dir, model, messages, config.AGENT_TIMEOUT,
                         self.pool.slots if self.pool else None)
+
+
+async def _with_notice(events: AsyncGenerator[dict, None], text: str) -> AsyncGenerator[dict, None]:
+    yield {"type": "notice", "content": text}
+    async for ev in events:
+        yield ev
