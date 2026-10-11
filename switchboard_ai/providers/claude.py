@@ -25,6 +25,12 @@ from switchboard_ai.discovery import find_claude_binaries, resolve
 from switchboard_ai.process import Msg, SessionPool, run_once
 from switchboard_ai.providers.base import UUID_RE, Provider, chat_system_prompt, tool_detail, allowed_chat_tools, split_tools
 
+
+def claude_media_block(media) -> dict:
+    """An Anthropic content block for an image or a PDF (base64)."""
+    kind = "document" if media.kind == "pdf" else "image"
+    return {"type": kind, "source": {"type": "base64", "media_type": media.mime_type, "data": media.data}}
+
 MODELS: list[dict] = [
     {"id": "claude-opus-5-5",            "name": "Claude Opus 5.5",   "tier": "Flagship"},
     {"id": "claude-fable-5-1",           "name": "Claude Fable 5.1",  "tier": "Creative"},
@@ -190,8 +196,10 @@ class ClaudeProvider(Provider):
 
     # ── Driver protocol ─────────────────────────────────────
 
-    def encode(self, text: str) -> bytes:
-        msg = {"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
+    def encode(self, text: str, media: list = ()) -> bytes:
+        content = [claude_media_block(m) for m in media if m.kind in ("image", "pdf")]
+        content.append({"type": "text", "text": text})
+        msg = {"type": "user", "message": {"role": "user", "content": content}}
         return (json.dumps(msg) + "\n").encode("utf-8")
 
     def new_parser(self):
@@ -258,7 +266,11 @@ class ClaudeProvider(Provider):
 
 
     def models(self) -> list[dict]:
-        return [{**m, "provider": self.id, "efforts": list(self.model_efforts(m["id"]))} for m in MODELS]
+        return [{**m, "provider": self.id, "efforts": list(self.model_efforts(m["id"])),
+                 "inputs": self.model_inputs(m["id"])} for m in MODELS]
+
+    def model_inputs(self, model: str) -> list[str]:
+        return ["text", "image", "pdf"]  # Claude reads images and PDFs, not audio
 
     def agent_tools(self) -> list[str]:
         tools = list(config.AGENT_ALLOWED_TOOLS)

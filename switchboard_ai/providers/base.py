@@ -144,6 +144,10 @@ class Provider:
         """Effort levels this model accepts (empty = it has no effort setting)."""
         return self.efforts
 
+    def model_inputs(self, model: str) -> list[str]:
+        """What a chat message may carry for this model: text, image, pdf, audio."""
+        return ["text"]
+
     def resolve_effort(self, model: str, effort: Optional[str]) -> tuple[str, str]:
         """(model, effort) to actually run: the requested level, else
         SWITCHBOARD_EFFORT, moved to the nearest level the model supports.

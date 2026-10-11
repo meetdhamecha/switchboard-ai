@@ -67,6 +67,8 @@ ANTIGRAVITY_OAUTH_CLIENT_SECRET: str = os.getenv("ANTIGRAVITY_OAUTH_CLIENT_SECRE
 
 # Working directory for chat turns (agent tasks choose their own).
 WORKING_DIR: str = os.getenv("WORKING_DIR", "").strip() or os.getcwd()
+# Largest single attachment (image / PDF / audio) accepted in a chat message.
+MAX_MEDIA_MB: int = int(os.getenv("MAX_MEDIA_MB", "20"))
 
 
 # ============================================================

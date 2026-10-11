@@ -140,7 +140,11 @@ class ClaudeAPIProvider(Provider):
         }
 
     def models(self) -> list[dict]:
-        return [{**m, "provider": self.id, "efforts": list(self.model_efforts(m["id"]))} for m in MODELS]
+        return [{**m, "provider": self.id, "efforts": list(self.model_efforts(m["id"])),
+                 "inputs": self.model_inputs(m["id"])} for m in MODELS]
+
+    def model_inputs(self, model: str) -> list[str]:
+        return ["text", "image", "pdf"]
 
     def model_efforts(self, model: str) -> tuple[str, ...]:
         return () if CLI_TO_API.get(model, model) in _NO_EFFORT else self.efforts
@@ -155,9 +159,18 @@ class ClaudeAPIProvider(Provider):
     # ── request building ────────────────────────────────────
 
     def _conversation(self, messages: list[Msg], session_id: Optional[str]) -> tuple[list[dict], str]:
+        from switchboard_ai.providers.claude import claude_media_block
+
         system = "\n\n".join(m.content for m in messages if m.role == "system" and m.content.strip())
-        turns = [{"role": m.role, "content": m.content} for m in messages
-                 if m.role in ("user", "assistant") and m.content.strip()]
+        turns = []
+        for m in messages:
+            if m.role not in ("user", "assistant") or not (m.content.strip() or m.media):
+                continue
+            if m.media and m.role == "user":
+                blocks = [claude_media_block(x) for x in m.media if x.kind in ("image", "pdf")]
+                turns.append({"role": m.role, "content": blocks + [{"type": "text", "text": m.content or " "}]})
+            else:
+                turns.append({"role": m.role, "content": m.content})
         # With a session, a client may send only the new message after turn one.
         if session_id and session_id in self._history and len(turns) == 1 and turns[0]["role"] == "user":
             turns = self._history[session_id][0] + turns

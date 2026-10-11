@@ -30,7 +30,7 @@ import subprocess
 import time
 import uuid
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import AsyncGenerator, Callable, Optional, Protocol
 
 # stream-json lines carrying tool results (e.g. a whole file that was Read)
@@ -40,9 +40,29 @@ _REAP_INTERVAL = 60
 
 
 @dataclass
+class Media:
+    """An attachment: kind is image | pdf | audio; data is base64."""
+    kind: str
+    mime_type: str
+    data: str
+
+
+@dataclass
 class Msg:
     role: str
     content: str
+    media: list[Media] = field(default_factory=list)
+
+
+def turn_media(messages: list[Msg], first_turn: bool) -> list[Media]:
+    """Attachments sent this turn: all of them on a process's first turn (it
+    gets the whole transcript), else those on the newest user message."""
+    if first_turn:
+        return [m for msg in messages if msg.role != "system" for m in msg.media]
+    for msg in reversed(messages):
+        if msg.role == "user":
+            return list(msg.media)
+    return []
 
 
 def flatten(messages: list[Msg]) -> str:
@@ -74,7 +94,7 @@ class Driver(Protocol):
 
     binary: str
 
-    def encode(self, text: str) -> bytes: ...
+    def encode(self, text: str, media: list[Media] = ()) -> bytes: ...
 
     def new_parser(self) -> Callable[[str], list[dict]]: ...
 
@@ -178,9 +198,10 @@ class ProcessSession:
                     return
 
             text = last_user(messages) if self.turns > 0 else flatten(messages)
+            media = turn_media(messages, self.turns == 0)
             proc = self.proc
             try:
-                proc.stdin.write(self.driver.encode(text))
+                proc.stdin.write(self.driver.encode(text, media) if media else self.driver.encode(text))
                 await proc.stdin.drain()
             except Exception as e:
                 await self.close()

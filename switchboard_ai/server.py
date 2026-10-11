@@ -23,6 +23,8 @@ One REST API over whichever CLI providers are installed.
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import hmac
 import json
 import time
@@ -41,7 +43,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from switchboard_ai import __version__, config
 from switchboard_ai.pacing import smooth_text_stream
-from switchboard_ai.process import Msg
+from switchboard_ai.process import Media, Msg
 from switchboard_ai.providers import RoutingError, registry
 from switchboard_ai.providers.base import EFFORT_LEVELS, Provider
 from switchboard_ai.orchestrator import orchestrator
@@ -588,9 +590,26 @@ def auth_save(body: SaveTokenBody):
 # SCHEMAS
 # ============================================================
 
+class ContentPart(BaseModel):
+    type: str = Field(..., description="text | image | pdf | audio")
+    text: Optional[str] = None
+    data: Optional[str] = Field(None, description="base64 bytes for image / pdf / audio")
+    mime_type: Optional[str] = Field(None, description="e.g. image/jpeg, application/pdf, audio/ogg")
+
+
 class Message(BaseModel):
     role: str = Field(..., description="user | assistant | system")
-    content: str
+    content: Union[str, list[ContentPart]] = Field(
+        ..., description="Text, or a list of parts: text plus image / pdf / audio (base64). "
+                         "GET /models shows which inputs each model accepts.")
+
+
+_MEDIA_TYPES = {
+    "image": {"image/jpeg", "image/png", "image/webp", "image/gif"},
+    "pdf": {"application/pdf"},
+    "audio": {"audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav", "audio/webm",
+              "audio/aac", "audio/flac"},
+}
 
 
 _EFFORT_HELP = (
@@ -669,7 +688,47 @@ def _now() -> str:
 
 
 def _msgs(messages: list[Message]) -> list[Msg]:
-    return [Msg(m.role, m.content) for m in messages]
+    out = []
+    limit = config.MAX_MEDIA_MB * 1024 * 1024
+    for m in messages:
+        if isinstance(m.content, str):
+            out.append(Msg(m.role, m.content))
+            continue
+        texts, media = [], []
+        for part in m.content:
+            if part.type == "text":
+                texts.append(part.text or "")
+                continue
+            allowed = _MEDIA_TYPES.get(part.type)
+            if allowed is None:
+                raise HTTPException(422, f"Unknown content part type: {part.type}")
+            if part.mime_type not in allowed:
+                raise HTTPException(422, f"{part.type} mime_type must be one of: {', '.join(sorted(allowed))}")
+            try:
+                raw = base64.b64decode(part.data or "", validate=True)
+            except (binascii.Error, ValueError):
+                raise HTTPException(422, f"{part.type} data is not valid base64")
+            if not raw:
+                raise HTTPException(422, f"{part.type} data is empty")
+            if len(raw) > limit:
+                raise HTTPException(413, f"{part.type} is larger than {config.MAX_MEDIA_MB} MB")
+            media.append(Media(part.type, part.mime_type, part.data))
+        out.append(Msg(m.role, "\n".join(t for t in texts if t), media))
+    return out
+
+
+def _check_inputs(provider, model: str, messages: list[Msg]) -> None:
+    """Refuse attachments the chosen model cannot read, naming models that can."""
+    needed = {m.kind for msg in messages for m in msg.media}
+    if not needed:
+        return
+    have = set(provider.model_inputs(model))
+    missing = needed - have
+    if missing:
+        able = [x["key"] for x in registry.models()
+                if x.get("available") and missing <= set(x.get("inputs") or [])][:6]
+        raise HTTPException(400, f"{model} cannot read {', '.join(sorted(missing))} input. "
+                                 f"Models that can: {', '.join(able) or 'none available'}")
 
 
 def _sse(obj: Union[dict, str]) -> str:
@@ -745,10 +804,13 @@ async def _chat_plan(
     if mode:
         if tools is not None:
             raise HTTPException(400, "tools can only be set with a named model, not auto-*")
+        if any(m.media for m in messages):
+            raise HTTPException(400, "attachments need a named model (see `inputs` in GET /models), not auto-*")
         name = next(k for k, v in MODES.items() if v == mode)
         return "auto", name, effort, orchestrator.stream(mode, messages, session_id, effort)
     p, m = registry.resolve(model, provider)
     m, e = p.resolve_effort(m, effort)
+    _check_inputs(p, m, messages)
     if tools is None:
         return p.id, m, e or None, p.chat(messages, m, session_id, e)
     return p.id, m, e or None, p.chat(messages, m, session_id, e, tools)
