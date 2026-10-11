@@ -738,6 +738,30 @@ def _sse(obj: Union[dict, str]) -> str:
 _SSE_HEADERS = {"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
 
 
+async def _keepalive(stream: AsyncGenerator[str, None]) -> AsyncGenerator[str, None]:
+    """Send an SSE comment line whenever the stream is quiet for SSE_PING_SECONDS.
+    A model can think for minutes before its first word; a proxy in front
+    (CloudFront) drops a connection that sends nothing for too long."""
+    it = stream.__aiter__()
+    nxt = asyncio.ensure_future(it.__anext__())
+    try:
+        while True:
+            done, _ = await asyncio.wait({nxt}, timeout=config.SSE_PING_SECONDS)
+            if not done:
+                yield ": ping\n\n"
+                continue
+            try:
+                chunk = nxt.result()
+            except StopAsyncIteration:
+                return
+            yield chunk
+            nxt = asyncio.ensure_future(it.__anext__())
+    finally:
+        if not nxt.done():
+            nxt.cancel()
+        await stream.aclose()
+
+
 def _paced(stream: AsyncGenerator[dict, None]) -> AsyncGenerator[dict, None]:
     return smooth_text_stream(stream) if config.SMOOTH_STREAM else stream
 
@@ -945,7 +969,7 @@ async def chat_stream(req: ChatRequest):
             yield _sse(ev)
         yield _sse({"type": "done"})
 
-    return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
+    return StreamingResponse(_keepalive(gen()), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 # ============================================================
@@ -1007,7 +1031,7 @@ async def agent_task_stream(req: AgentRequest):
             yield _sse(ev)
         yield _sse({"type": "done"})
 
-    return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
+    return StreamingResponse(_keepalive(gen()), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 # ============================================================
@@ -1130,7 +1154,7 @@ async def oai_chat(req: OAIRequest, x_session_id: Optional[str] = Header(None)):
         yield chunk({}, "stop")
         yield _sse("[DONE]")
 
-    return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
+    return StreamingResponse(_keepalive(gen()), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 # ============================================================

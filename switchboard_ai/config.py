@@ -138,6 +138,8 @@ CLAUDE_MAX_CONCURRENT: int = int(os.getenv("CLAUDE_MAX_CONCURRENT", "6"))
 AGY_MAX_CONCURRENT: int = int(os.getenv("AGY_MAX_CONCURRENT", "4"))
 # Seconds a request may wait for a free slot before it gets "server busy" (429).
 QUEUE_TIMEOUT: float = float(os.getenv("QUEUE_TIMEOUT", "90"))
+# Streams send ": ping" after this many quiet seconds so proxies keep them open.
+SSE_PING_SECONDS: float = float(os.getenv("SSE_PING_SECONDS", "15"))
 # Warm conversation processes kept per provider; the least recently used idle
 # one is closed beyond this (its next turn restarts with the full transcript).
 MAX_SESSIONS: int = int(os.getenv("MAX_SESSIONS", "12"))
